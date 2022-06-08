@@ -21,7 +21,7 @@
 
 **目前遇到的问题**  
 1. PyTorch模型导出ONNX模型时，会形成大量的算子  
-16.4MB的002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth模型导出ONNX后，ONNX包含了29308个节点  
+16.4MB的002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth模型导出ONNX后，ONNX包含了29308个节点/13420-BasicLayer/7462-RSTB/6559-只保留shift-mask计算过程  
 64.2MB的001_classicalSR_DF2K_s64w8_SwinIR-M_x2.pth模型导出ONNX后，ONNX包含了43819个节点  
 而初赛中，136MB的encoder模型导出ONNX后，只有1990个节点  
 大量的节点导致导出ONNX时很容易出现显存不足的问题。在导ONNX模型后发现，很多节点其实是涉及形状操作的节点，后续解决思路有两个：1、从源代码出发，删除或合一些形状相关的操作；2、对ONNX网络进行修改。  
