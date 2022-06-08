@@ -30,8 +30,24 @@
 2. ONNX模型转TRT时，会有尺寸相关报错信息  
 初步定位到的问题是原模型保存了attention mask，导致导出ONNX时把mask当成是一个常量，而不是一个随着输入图像尺寸变化而变化的变量。后续解决思路有两个：1、在网络前向时才生成mask；2、提前计算好mask，把mask当成输入。  
 
-## 优化过程
-无
+## 优化过程  
+
+**下载预训练模型**
+```bash
+cd model_zoo/swinir
+chmod +x ./download.sh
+./download.sh
+```
+
+**PyTorch测评**
+```python
+python main_test_swinir.py --task lightweight_sr --scale 2 --model_path model_zoo/swinir/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth --folder_lq testsets/Set5/LR_bicubic/X2 --folder_gt testsets/Set5/HR
+```
+
+**导出ONNX模型**
+```python
+python export.py --task lightweight_sr --scale 2 --model_path model_zoo/swinir/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth --folder_lq testsets/Set5/LR_bicubic/X2 --folder_gt testsets/Set5/HR
+```
 
 ## 精度与加速效果
 无
