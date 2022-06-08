@@ -62,13 +62,12 @@ def export():
                      input_names=['images'],
                      output_names=['outputs'],
                      dynamic_axes={'images': {0: 'batch', 2: 'height', 3: 'width'},
-                                   'outputs': {0: 'batch', 1: 'height_out', 2: 'width_out'}
-                                #    'output': {0: 'batch_new', 1: 'h', 2: 'w'}
+                                   'outputs': {0: 'batch', 2: 'height_out', 3: 'width_out'}
                                   }
                     )
 
     graph = gs.import_onnx(onnx.load(onnx_file))
-    print(f"Number of onnx nodes: f{len(graph.nodes)}")
+    print(f"Number of onnx nodes: {len(graph.nodes)}")
 
 def setup(args):
     # 001 classical image sr/ 002 lightweight image sr

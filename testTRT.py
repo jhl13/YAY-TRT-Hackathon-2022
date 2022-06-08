@@ -266,13 +266,13 @@ def calculate_ssim(img1, img2, crop_border, input_order='HWC', test_y_channel=Fa
     return np.array(ssims).mean()
 
 
-graph = gs.import_onnx(onnx.load("/target/SwinIR/onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.onnx"))
+graph = gs.import_onnx(onnx.load("onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.onnx"))
 print("graph nodes: ", len(graph.nodes))
 
 folder_lq = "testsets/Set5/LR_bicubic/X2"
 folder_gt = "testsets/Set5/HR"
-plan_file = "/target/SwinIR/onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.plan"
-plugin_path = "/target/SwinIR/plugin/"
+plan_file = "onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.plan"
+plugin_path = "plugin/"
 soFileList = glob(plugin_path + "*.so")
 task = "classical_sr"
 scale = 2
@@ -325,12 +325,14 @@ test_results['ssim_y'] = []
 test_results['psnr_b'] = []
 psnr, ssim, psnr_y, ssim_y, psnr_b = 0, 0, 0, 0, 0
 
-for idx, path in enumerate(sorted(glob(os.path.join(folder_gt, '*')))[0:1]):
+for idx, path in enumerate(sorted(glob(os.path.join(folder_gt, '*')))):
     imgname, img_lq, img_gt = get_image_pair(task, path)  # image to HWC-BGR, float32
     img_lq = np.transpose(img_lq if img_lq.shape[2] == 1 else img_lq[:, :, [2, 1, 0]], (2, 0, 1))  # HCW-BGR to CHW-RGB
     img_lq = img_lq[np.newaxis, :, :, :]
 
     _, _, h_old, w_old = img_lq.shape
+    if h_old != 256 and w_old != 256:
+        continue
     # h_pad = (h_old // window_size + 1) * window_size - h_old
     # w_pad = (w_old // window_size + 1) * window_size - w_old
     # img_lq = np.concatenate([img_lq, np.flip(img_lq, [2])], 2)[:, :, :h_old + h_pad, :]

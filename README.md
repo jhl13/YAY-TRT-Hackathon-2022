@@ -32,6 +32,13 @@
 
 ## 优化过程  
 
+**安装**  
+```bash
+apt-get install libgl1-mesa-glx
+pip install -r requirments.txt # 有可能需要单独先安装 nvidia-pyindex
+```
+
+
 **下载预训练模型**
 ```bash
 cd model_zoo/swinir
@@ -47,6 +54,16 @@ python main_test_swinir.py --task lightweight_sr --scale 2 --model_path model_zo
 **导出ONNX模型**
 ```python
 python export.py --task lightweight_sr --scale 2 --model_path model_zoo/swinir/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth --folder_lq testsets/Set5/LR_bicubic/X2 --folder_gt testsets/Set5/HR
+```
+
+**导出TensorRT模型**
+```python
+python onnx2trt.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.onnx
+```
+
+**测试TensorRT模型**(目前只支持固定尺寸，不支持动态尺寸)  
+```python
+python testTRT.py
 ```
 
 ## 精度与加速效果
