@@ -819,18 +819,17 @@ class SwinIR(nn.Module):
         x_size = (x.shape[2], x.shape[3])
         mask = self.calculate_mask(x_size).to(x.device)
         mask_shift = self.calculate_mask(x_size, self.window_size // 2).to(x.device)
-        return mask_shift
+
         x = self.patch_embed(x)
         if self.ape:
             x = x + self.absolute_pos_embed
         x = self.pos_drop(x)
 
-        for layer in self.layers:
+        for layer in self.layers[:1]:
             x = layer(x, x_size, mask, mask_shift)
 
         x = self.norm(x)  # B L C
-        x = self.patch_unembed(x, x_size)
-
+        # x = self.patch_unembed(x, x_size)
         return x
 
     def forward(self, x):

@@ -72,7 +72,7 @@ def main():
             # img_lq = torch.cat([img_lq, torch.flip(img_lq, [2])], 2)[:, :, :h_old + h_pad, :]
             # img_lq = torch.cat([img_lq, torch.flip(img_lq, [3])], 3)[:, :, :, :w_old + w_pad]
             print(img_lq.shape)
-            for i in range(3):
+            for i in range(10):
                 output = test(img_lq, model, args, window_size)
             t0 = time_ns()
             for i in range(30):
@@ -81,8 +81,8 @@ def main():
             timePerInference = (t1-t0)/1000/1000/30
             # timePerInference = 0
             # output = test(img_lq, model, args, window_size)
-            output = output[..., :h_old * args.scale, :w_old * args.scale]
-
+            # output = output[..., :h_old * args.scale, :w_old * args.scale]
+        print(timePerInference)
         save_npz_file = path.replace(".png", ".npz")
         output = output.data.float().cpu().numpy()
         np.savez(save_npz_file, output=output)
