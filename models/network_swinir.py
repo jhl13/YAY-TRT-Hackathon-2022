@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-
+import numpy as np
 
 class Mlp(nn.Module):
     def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
@@ -812,15 +812,14 @@ class SwinIR(nn.Module):
         mask_windows = window_partition(img_mask, self.window_size)  # nW, window_size, window_size, 1
         mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
         attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
-        attn_mask = attn_mask.masked_fill(attn_mask != 0, float(-100.0)).masked_fill(attn_mask == 0, float(0.0))
-
+        attn_mask = attn_mask.masked_fill(attn_mask != 0, float(-100.0)) # .masked_fill(attn_mask == 0, float(0.0))
         return attn_mask
 
     def forward_features(self, x):
         x_size = (x.shape[2], x.shape[3])
         mask = self.calculate_mask(x_size).to(x.device)
         mask_shift = self.calculate_mask(x_size, self.window_size // 2).to(x.device)
-
+        return mask_shift
         x = self.patch_embed(x)
         if self.ape:
             x = x + self.absolute_pos_embed
@@ -841,7 +840,6 @@ class SwinIR(nn.Module):
         w_pad = (w_old // self.window_size + 1) * self.window_size - w_old
         x = torch.cat([x, torch.flip(x, [2])], 2)[:, :, :h_old + h_pad, :]
         x = torch.cat([x, torch.flip(x, [3])], 3)[:, :, :, :w_old + w_pad]
-
         H, W = x.shape[2:]
         # x = self.check_image_size(x)
         self.mean = self.mean.type_as(x)
@@ -856,6 +854,8 @@ class SwinIR(nn.Module):
         elif self.upsampler == 'pixelshuffledirect':
             # for lightweight SR
             x = self.conv_first(x)
+            x = self.forward_features(x)
+            return x
             x = self.conv_after_body(self.forward_features(x)) + x
             x = self.upsample(x)
         elif self.upsampler == 'nearest+conv':

@@ -57,7 +57,7 @@ def main():
     test_results['psnr_b'] = []
     psnr, ssim, psnr_y, ssim_y, psnr_b = 0, 0, 0, 0, 0
 
-    for idx, path in enumerate(sorted(glob.glob(os.path.join(folder, '*')))):
+    for idx, path in enumerate(sorted(glob.glob(os.path.join(folder, '*.png')))):
         # read image
         imgname, img_lq, img_gt = get_image_pair(args, path)  # image to HWC-BGR, float32
         img_lq = np.transpose(img_lq if img_lq.shape[2] == 1 else img_lq[:, :, [2, 1, 0]], (2, 0, 1))  # HCW-BGR to CHW-RGB
@@ -83,50 +83,54 @@ def main():
             # output = test(img_lq, model, args, window_size)
             output = output[..., :h_old * args.scale, :w_old * args.scale]
 
-        # save image
-        output = output.data.squeeze().float().cpu().clamp_(0, 1).numpy()
-        if output.ndim == 3:
-            output = np.transpose(output[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
-        output = (output * 255.0).round().astype(np.uint8)  # float32 to uint8
-        cv2.imwrite(f'{save_dir}/{imgname}_SwinIR.png', output)
+        save_npz_file = path.replace(".png", ".npz")
+        output = output.data.float().cpu().numpy()
+        np.savez(save_npz_file, output=output)
+        # np.savez()
+    #     # save image
+    #     output = output.data.squeeze().float().cpu().clamp_(0, 1).numpy()
+    #     if output.ndim == 3:
+    #         output = np.transpose(output[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
+    #     output = (output * 255.0).round().astype(np.uint8)  # float32 to uint8
+    #     cv2.imwrite(f'{save_dir}/{imgname}_SwinIR.png', output)
 
-        # evaluate psnr/ssim/psnr_b
-        if img_gt is not None:
-            img_gt = (img_gt * 255.0).round().astype(np.uint8)  # float32 to uint8
-            img_gt = img_gt[:h_old * args.scale, :w_old * args.scale, ...]  # crop gt
-            img_gt = np.squeeze(img_gt)
+    #     # evaluate psnr/ssim/psnr_b
+    #     if img_gt is not None:
+    #         img_gt = (img_gt * 255.0).round().astype(np.uint8)  # float32 to uint8
+    #         img_gt = img_gt[:h_old * args.scale, :w_old * args.scale, ...]  # crop gt
+    #         img_gt = np.squeeze(img_gt)
 
-            psnr = util.calculate_psnr(output, img_gt, crop_border=border)
-            ssim = util.calculate_ssim(output, img_gt, crop_border=border)
-            test_results['psnr'].append(psnr)
-            test_results['ssim'].append(ssim)
-            if img_gt.ndim == 3:  # RGB image
-                psnr_y = util.calculate_psnr(output, img_gt, crop_border=border, test_y_channel=True)
-                ssim_y = util.calculate_ssim(output, img_gt, crop_border=border, test_y_channel=True)
-                test_results['psnr_y'].append(psnr_y)
-                test_results['ssim_y'].append(ssim_y)
-            if args.task in ['jpeg_car']:
-                psnr_b = util.calculate_psnrb(output, img_gt, crop_border=border, test_y_channel=True)
-                test_results['psnr_b'].append(psnr_b)
-            print('Testing {:d} {:20s} - PSNR: {:.2f} dB; SSIM: {:.4f}; '
-                  'PSNR_Y: {:.2f} dB; SSIM_Y: {:.4f}; '
-                  'PSNR_B: {:.2f} dB.; Inference time: {:.2f}'.
-                  format(idx, imgname, psnr, ssim, psnr_y, ssim_y, psnr_b, timePerInference))
-        else:
-            print('Testing {:d} {:20s}'.format(idx, imgname))
+    #         psnr = util.calculate_psnr(output, img_gt, crop_border=border)
+    #         ssim = util.calculate_ssim(output, img_gt, crop_border=border)
+    #         test_results['psnr'].append(psnr)
+    #         test_results['ssim'].append(ssim)
+    #         if img_gt.ndim == 3:  # RGB image
+    #             psnr_y = util.calculate_psnr(output, img_gt, crop_border=border, test_y_channel=True)
+    #             ssim_y = util.calculate_ssim(output, img_gt, crop_border=border, test_y_channel=True)
+    #             test_results['psnr_y'].append(psnr_y)
+    #             test_results['ssim_y'].append(ssim_y)
+    #         if args.task in ['jpeg_car']:
+    #             psnr_b = util.calculate_psnrb(output, img_gt, crop_border=border, test_y_channel=True)
+    #             test_results['psnr_b'].append(psnr_b)
+    #         print('Testing {:d} {:20s} - PSNR: {:.2f} dB; SSIM: {:.4f}; '
+    #               'PSNR_Y: {:.2f} dB; SSIM_Y: {:.4f}; '
+    #               'PSNR_B: {:.2f} dB.; Inference time: {:.2f}'.
+    #               format(idx, imgname, psnr, ssim, psnr_y, ssim_y, psnr_b, timePerInference))
+    #     else:
+    #         print('Testing {:d} {:20s}'.format(idx, imgname))
 
-    # summarize psnr/ssim
-    if img_gt is not None:
-        ave_psnr = sum(test_results['psnr']) / len(test_results['psnr'])
-        ave_ssim = sum(test_results['ssim']) / len(test_results['ssim'])
-        print('\n{} \n-- Average PSNR/SSIM(RGB): {:.2f} dB; {:.4f}'.format(save_dir, ave_psnr, ave_ssim))
-        if img_gt.ndim == 3:
-            ave_psnr_y = sum(test_results['psnr_y']) / len(test_results['psnr_y'])
-            ave_ssim_y = sum(test_results['ssim_y']) / len(test_results['ssim_y'])
-            print('-- Average PSNR_Y/SSIM_Y: {:.2f} dB; {:.4f}'.format(ave_psnr_y, ave_ssim_y))
-        if args.task in ['jpeg_car']:
-            ave_psnr_b = sum(test_results['psnr_b']) / len(test_results['psnr_b'])
-            print('-- Average PSNR_B: {:.2f} dB'.format(ave_psnr_b))
+    # # summarize psnr/ssim
+    # if img_gt is not None:
+    #     ave_psnr = sum(test_results['psnr']) / len(test_results['psnr'])
+    #     ave_ssim = sum(test_results['ssim']) / len(test_results['ssim'])
+    #     print('\n{} \n-- Average PSNR/SSIM(RGB): {:.2f} dB; {:.4f}'.format(save_dir, ave_psnr, ave_ssim))
+    #     if img_gt.ndim == 3:
+    #         ave_psnr_y = sum(test_results['psnr_y']) / len(test_results['psnr_y'])
+    #         ave_ssim_y = sum(test_results['ssim_y']) / len(test_results['ssim_y'])
+    #         print('-- Average PSNR_Y/SSIM_Y: {:.2f} dB; {:.4f}'.format(ave_psnr_y, ave_ssim_y))
+    #     if args.task in ['jpeg_car']:
+    #         ave_psnr_b = sum(test_results['psnr_b']) / len(test_results['psnr_b'])
+    #         print('-- Average PSNR_B: {:.2f} dB'.format(ave_psnr_b))
 
 
 def define_model(args):

@@ -266,15 +266,26 @@ def calculate_ssim(img1, img2, crop_border, input_order='HWC', test_y_channel=Fa
     return np.array(ssims).mean()
 
 
-graph = gs.import_onnx(onnx.load("onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.onnx"))
+def check(a, b, weak=False, epsilon = 1e-5):
+    if weak:
+        res = np.all( np.abs(a - b) < epsilon )
+    else:
+        res = np.all( a == b )
+    diff0 = np.max(np.abs(a - b))
+    diff1 = np.median(np.abs(a - b) / (np.abs(b) + epsilon))
+    #print("check:",res,diff0,diff1)
+    return res, diff0, diff1
+
+
+graph = gs.import_onnx(onnx.load("onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.onnx"))
 print("graph nodes: ", len(graph.nodes))
 
 folder_lq = "testsets/Set5/LR_bicubic/X2"
 folder_gt = "testsets/Set5/HR"
-plan_file = "onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.plan"
+plan_file = "onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.plan"
 plugin_path = "plugin/"
 soFileList = glob(plugin_path + "*.so")
-task = "classical_sr"
+task = "lightweight_sr"
 scale = 2
 window_size = 8
 border = 2
@@ -325,14 +336,14 @@ test_results['ssim_y'] = []
 test_results['psnr_b'] = []
 psnr, ssim, psnr_y, ssim_y, psnr_b = 0, 0, 0, 0, 0
 
-for idx, path in enumerate(sorted(glob(os.path.join(folder_gt, '*')))):
+for idx, path in enumerate(sorted(glob(os.path.join(folder_gt, '*.png')))):
     imgname, img_lq, img_gt = get_image_pair(task, path)  # image to HWC-BGR, float32
     img_lq = np.transpose(img_lq if img_lq.shape[2] == 1 else img_lq[:, :, [2, 1, 0]], (2, 0, 1))  # HCW-BGR to CHW-RGB
     img_lq = img_lq[np.newaxis, :, :, :]
 
     _, _, h_old, w_old = img_lq.shape
-    if h_old != 256 and w_old != 256:
-        continue
+    # if h_old != 256 and w_old != 256:
+    #     continue
     # h_pad = (h_old // window_size + 1) * window_size - h_old
     # w_pad = (w_old // window_size + 1) * window_size - w_old
     # img_lq = np.concatenate([img_lq, np.flip(img_lq, [2])], 2)[:, :, :h_old + h_pad, :]
@@ -370,32 +381,40 @@ for idx, path in enumerate(sorted(glob(os.path.join(folder_gt, '*')))):
 
     index_output = engine.get_binding_index("outputs")
     output = bufferH[index_output]
-    output = output[..., :h_old * scale, :w_old * scale]
 
-    # save image
-    output = np.clip(np.squeeze(output), 0.0, 1.0)
-    if output.ndim == 3:
-        output = np.transpose(output[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
-    output = (output * 255.0).round().astype(np.uint8)  # float32 to uint8
+    gt_data = np.load(path.replace(".png", ".npz"))
+    gt_output = gt_data["output"]
+    check_res = check(output, gt_output, True)
+    print(output.shape)
+    string = "%4d,%4d,%8.3f,%9.3e,%9.3e"%(h_old, w_old, timePerInference, check_res[1], check_res[2])
+    print(string + ", %s"%("Good" if check_res[1] < 1e-4 and check_res[2] < 1e-4 else "Bad"))
 
-    # evaluate psnr/ssim/psnr_b
-    if img_gt is not None:
-        img_gt = (img_gt * 255.0).round().astype(np.uint8)  # float32 to uint8
-        img_gt = img_gt[:h_old * scale, :w_old * scale, ...]  # crop gt
-        img_gt = np.squeeze(img_gt)
+    # output = output[..., :h_old * scale, :w_old * scale]
 
-        psnr = calculate_psnr(output, img_gt, crop_border=border)
-        ssim = calculate_ssim(output, img_gt, crop_border=border)
-        test_results['psnr'].append(psnr)
-        test_results['ssim'].append(ssim)
-        if img_gt.ndim == 3:  # RGB image
-            psnr_y = calculate_psnr(output, img_gt, crop_border=border, test_y_channel=True)
-            ssim_y = calculate_ssim(output, img_gt, crop_border=border, test_y_channel=True)
-            test_results['psnr_y'].append(psnr_y)
-            test_results['ssim_y'].append(ssim_y)
-        print('Testing {:d} {:20s} - PSNR: {:.2f} dB; SSIM: {:.4f}; '
-                'PSNR_Y: {:.2f} dB; SSIM_Y: {:.4f}; '
-                'PSNR_B: {:.2f} dB.; Inference time: {:.2f}'.
-                format(idx, imgname, psnr, ssim, psnr_y, ssim_y, psnr_b, timePerInference))
-    else:
-        print('Testing {:d} {:20s}'.format(idx, imgname))
+    # # save image
+    # output = np.clip(np.squeeze(output), 0.0, 1.0)
+    # if output.ndim == 3:
+    #     output = np.transpose(output[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
+    # output = (output * 255.0).round().astype(np.uint8)  # float32 to uint8
+
+    # # evaluate psnr/ssim/psnr_b
+    # if img_gt is not None:
+    #     img_gt = (img_gt * 255.0).round().astype(np.uint8)  # float32 to uint8
+    #     img_gt = img_gt[:h_old * scale, :w_old * scale, ...]  # crop gt
+    #     img_gt = np.squeeze(img_gt)
+
+    #     psnr = calculate_psnr(output, img_gt, crop_border=border)
+    #     ssim = calculate_ssim(output, img_gt, crop_border=border)
+    #     test_results['psnr'].append(psnr)
+    #     test_results['ssim'].append(ssim)
+    #     if img_gt.ndim == 3:  # RGB image
+    #         psnr_y = calculate_psnr(output, img_gt, crop_border=border, test_y_channel=True)
+    #         ssim_y = calculate_ssim(output, img_gt, crop_border=border, test_y_channel=True)
+    #         test_results['psnr_y'].append(psnr_y)
+    #         test_results['ssim_y'].append(ssim_y)
+    #     print('Testing {:d} {:20s} - PSNR: {:.2f} dB; SSIM: {:.4f}; '
+    #             'PSNR_Y: {:.2f} dB; SSIM_Y: {:.4f}; '
+    #             'PSNR_B: {:.2f} dB.; Inference time: {:.2f}'.
+    #             format(idx, imgname, psnr, ssim, psnr_y, ssim_y, psnr_b, timePerInference))
+    # else:
+    #     print('Testing {:d} {:20s}'.format(idx, imgname))

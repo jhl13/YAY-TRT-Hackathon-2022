@@ -6,7 +6,7 @@ import ctypes
 
 def onnx2trt():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--onnxFile", type=str, default="./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.onnx",
+    parser.add_argument("--onnxFile", type=str, default="./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.onnx",
                         help="onnx file path.")
     parser.add_argument("--trtFile", type=str, default=None,
                         help="onnx file path.")
@@ -20,7 +20,7 @@ def onnx2trt():
     print(f"onnxFile: {onnxFile}")
     print(f"trtFile: {trtFile}")
 
-    PluginPath   = "/target/SwinIR/plugin/"
+    PluginPath   = "./plugin/"
     soFileList = glob(PluginPath + "*.so")
 
     logger = trt.Logger(trt.Logger.WARNING)
@@ -41,7 +41,7 @@ def onnx2trt():
         print(f"Input{i} name: ", network.get_input(i).name)
     inputTensor1 = network.get_input(0)
 
-    profile.set_shape(inputTensor1.name, [1, 3, 256, 256], [1, 3, 256, 256], [1, 3, 256, 256])
+    profile.set_shape(inputTensor1.name, [1, 3, 114, 114], [1, 3, 256, 256], [1, 3, 512, 512])
     config.add_optimization_profile(profile)
 
     config.profiling_verbosity = trt.ProfilingVerbosity.VERBOSE
