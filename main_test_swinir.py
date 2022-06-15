@@ -83,6 +83,7 @@ def main():
             # output = test(img_lq, model, args, window_size)
             # output = output[..., :h_old * args.scale, :w_old * args.scale]
         print(timePerInference)
+        print(output.shape)
         save_npz_file = path.replace(".png", ".npz")
         output = output.data.float().cpu().numpy()
         np.savez(save_npz_file, output=output)

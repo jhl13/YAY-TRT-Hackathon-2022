@@ -33,7 +33,7 @@ def onnx2trt():
     parser = trt.OnnxParser(network, logger)
     parser.parse_from_file(onnxFile)
     config = builder.create_builder_config()
-    config.max_workspace_size = 12 << 30
+    # config.max_workspace_size = 12 << 30
 
     profile = builder.create_optimization_profile()
     print("==== inputs name:")

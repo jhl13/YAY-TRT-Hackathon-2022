@@ -117,7 +117,7 @@ public:
     DataType getOutputDataType(int outputIndex, const DataType* inputTypes, int nbInputs) const noexcept override
     {
         WHERE_AM_I();
-        return DataType::kHALF;
+        return DataType::kFLOAT;
     }
 
     void configurePlugin(const DynamicPluginTensorDesc* in, int32_t nbInputs,const DynamicPluginTensorDesc* out, int32_t nbOutputs) noexcept override

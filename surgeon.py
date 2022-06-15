@@ -26,11 +26,11 @@ for node_id, node in enumerate(graph.nodes):
         lastNode.outputs = []
         nFill += 1
 
-    if node.name == "ConstantOfShape_117": # ConstantOfShape_62
+    if node.name == "ConstantOfShape_117": # ConstantOfShape_62 ConstantOfShape_117
         ConstantOfShapeNode = node
-    if node.name == "Shape_139": # Shape_84
+    if node.name == "Shape_139": # Shape_84 Shape_139
         ShapeNode = node
-    if node.name == "ScatterND_1080": # ScatterND_1025
+    if node.name == "ScatterND_1080": # ScatterND_1025 ScatterND_1080
         ScatterNDNode = node
 
     if node.op == 'ReduceMean' and \
