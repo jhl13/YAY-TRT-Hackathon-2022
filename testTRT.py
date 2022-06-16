@@ -1,6 +1,7 @@
 import onnx
 import onnx_graphsurgeon as gs
 
+import argparse
 import os
 import sys
 import ctypes
@@ -276,145 +277,156 @@ def check(a, b, weak=False, epsilon = 1e-5):
     #print("check:",res,diff0,diff1)
     return res, diff0, diff1
 
+def testTRT():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--onnxFile", type=str, default=None,
+                        help="onnx file path.")
+    parser.add_argument("--TRTFile", type=str, default="./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.plan",
+                        help="onnx file path.")
+    args = parser.parse_args()
 
-graph = gs.import_onnx(onnx.load("onnx_zoo/swinir_classical_sr_x2/001_classicalSR_DF2K_s64w8_SwinIR-M_x2_surgeon.onnx"))
-print("graph nodes: ", len(graph.nodes))
+    if args.onnxFile is not None:
+        graph = gs.import_onnx(onnx.load(args.onnxFile))
+        print("graph nodes: ", len(graph.nodes))
 
-folder_lq = "testsets/Set5/LR_bicubic/X2"
-folder_gt = "testsets/Set5/HR"
-plan_file = "onnx_zoo/swinir_classical_sr_x2/001_classicalSR_DF2K_s64w8_SwinIR-M_x2_surgeon.plan"
-plugin_path = "plugin/"
-soFileList = glob(plugin_path + "*.so")
-task = "lightweight_sr"
-scale = 2
-window_size = 8
-border = 2
+    folder_lq = "testsets/Set5/LR_bicubic/X2"
+    folder_gt = "testsets/Set5/HR"
+    plan_file = args.TRTFile
+    plugin_path = "plugin/"
+    soFileList = glob(plugin_path + "*.so")
+    task = "lightweight_sr"
+    scale = 2
+    window_size = 8
+    border = 2
 
-def get_image_pair(task, path):
-    (imgname, imgext) = os.path.splitext(os.path.basename(path))
+    def get_image_pair(task, path):
+        (imgname, imgext) = os.path.splitext(os.path.basename(path))
 
-    # 001 classical image sr/ 002 lightweight image sr (load lq-gt image pairs)
-    if task in ["classical_sr", "lightweight_sr"]:
-        img_gt = cv2.imread(path, cv2.IMREAD_COLOR).astype(np.float32) / 255.
-        img_lq = cv2.imread(f"{folder_lq}/{imgname}x{scale}{imgext}", cv2.IMREAD_COLOR).astype(
-            np.float32) / 255.
-    return imgname, img_lq, img_gt
-#-------------------------------------------------------------------------------
+        # 001 classical image sr/ 002 lightweight image sr (load lq-gt image pairs)
+        if task in ["classical_sr", "lightweight_sr"]:
+            img_gt = cv2.imread(path, cv2.IMREAD_COLOR).astype(np.float32) / 255.
+            img_lq = cv2.imread(f"{folder_lq}/{imgname}x{scale}{imgext}", cv2.IMREAD_COLOR).astype(
+                np.float32) / 255.
+        return imgname, img_lq, img_gt
+    #-------------------------------------------------------------------------------
 
-logger = trt.Logger(trt.Logger.ERROR)
-trt.init_libnvinfer_plugins(logger, '')
+    logger = trt.Logger(trt.Logger.ERROR)
+    trt.init_libnvinfer_plugins(logger, '')
 
-if len(soFileList) > 0:
-    print("Find Plugin %s!"%soFileList)
-else:
-    print("No Plugin!")
-for soFile in soFileList:
-    ctypes.cdll.LoadLibrary(soFile)
-#-------------------------------------------------------------------------------
+    if len(soFileList) > 0:
+        print("Find Plugin %s!"%soFileList)
+    else:
+        print("No Plugin!")
+    for soFile in soFileList:
+        ctypes.cdll.LoadLibrary(soFile)
+    #-------------------------------------------------------------------------------
 
-print("Test Plan!")
-if os.path.isfile(plan_file):
-    with open(plan_file, 'rb') as encoderF:
-        engine = trt.Runtime(logger).deserialize_cuda_engine(encoderF.read())
-    if engine is None:
-        print("Failed loading %s"%plan_file)
+    print("Test Plan!")
+    if os.path.isfile(plan_file):
+        with open(plan_file, 'rb') as encoderF:
+            engine = trt.Runtime(logger).deserialize_cuda_engine(encoderF.read())
+        if engine is None:
+            print("Failed loading %s"%plan_file)
+            exit()
+        print("Succeeded loading %s"%plan_file)
+    else:
+        print("Failed finding %s"%plan_file)
         exit()
-    print("Succeeded loading %s"%plan_file)
-else:
-    print("Failed finding %s"%plan_file)
-    exit()
-nInput = np.sum([ engine.binding_is_input(i) for i in range(engine.num_bindings) ])
-nOutput = engine.num_bindings - nInput
-context = engine.create_execution_context()
-#-------------------------------------------------------------------------------
+    nInput = np.sum([ engine.binding_is_input(i) for i in range(engine.num_bindings) ])
+    nOutput = engine.num_bindings - nInput
+    context = engine.create_execution_context()
+    #-------------------------------------------------------------------------------
 
-test_results = OrderedDict()
-test_results['psnr'] = []
-test_results['ssim'] = []
-test_results['psnr_y'] = []
-test_results['ssim_y'] = []
-test_results['psnr_b'] = []
-psnr, ssim, psnr_y, ssim_y, psnr_b = 0, 0, 0, 0, 0
+    test_results = OrderedDict()
+    test_results['psnr'] = []
+    test_results['ssim'] = []
+    test_results['psnr_y'] = []
+    test_results['ssim_y'] = []
+    test_results['psnr_b'] = []
+    psnr, ssim, psnr_y, ssim_y, psnr_b = 0, 0, 0, 0, 0
 
-for idx, path in enumerate(sorted(glob(os.path.join(folder_gt, '*.png')))):
-    imgname, img_lq, img_gt = get_image_pair(task, path)  # image to HWC-BGR, float32
-    img_lq = np.transpose(img_lq if img_lq.shape[2] == 1 else img_lq[:, :, [2, 1, 0]], (2, 0, 1))  # HCW-BGR to CHW-RGB
-    img_lq = img_lq[np.newaxis, :, :, :]
+    for idx, path in enumerate(sorted(glob(os.path.join(folder_gt, '*.png')))):
+        imgname, img_lq, img_gt = get_image_pair(task, path)  # image to HWC-BGR, float32
+        img_lq = np.transpose(img_lq if img_lq.shape[2] == 1 else img_lq[:, :, [2, 1, 0]], (2, 0, 1))  # HCW-BGR to CHW-RGB
+        img_lq = img_lq[np.newaxis, :, :, :]
 
-    _, _, h_old, w_old = img_lq.shape
-    # if h_old != 256 and w_old != 256:
-    #     continue
-    # h_pad = (h_old // window_size + 1) * window_size - h_old
-    # w_pad = (w_old // window_size + 1) * window_size - w_old
-    # img_lq = np.concatenate([img_lq, np.flip(img_lq, [2])], 2)[:, :, :h_old + h_pad, :]
-    # img_lq = np.concatenate([img_lq, np.flip(img_lq, [3])], 3)[:, :, :, :w_old + w_pad]
+        _, _, h_old, w_old = img_lq.shape
+        # if h_old != 256 and w_old != 256:
+        #     continue
+        # h_pad = (h_old // window_size + 1) * window_size - h_old
+        # w_pad = (w_old // window_size + 1) * window_size - w_old
+        # img_lq = np.concatenate([img_lq, np.flip(img_lq, [2])], 2)[:, :, :h_old + h_pad, :]
+        # img_lq = np.concatenate([img_lq, np.flip(img_lq, [3])], 3)[:, :, :, :w_old + w_pad]
 
-    context.set_binding_shape(0, img_lq.shape)
-    bufferH = []
-    bufferH.append( img_lq.astype(np.float32).reshape(-1) )
+        context.set_binding_shape(0, img_lq.shape)
+        bufferH = []
+        bufferH.append( img_lq.astype(np.float32).reshape(-1) )
 
-    for i in range(nInput, nInput + nOutput):                
-        bufferH.append( np.empty(context.get_binding_shape(i), dtype=trt.nptype(engine.get_binding_dtype(i))) )
+        for i in range(nInput, nInput + nOutput):                
+            bufferH.append( np.empty(context.get_binding_shape(i), dtype=trt.nptype(engine.get_binding_dtype(i))) )
 
-    bufferD = []
-    for i in range(nInput + nOutput):                
-        bufferD.append( cudart.cudaMalloc(bufferH[i].nbytes)[1] )
+        bufferD = []
+        for i in range(nInput + nOutput):                
+            bufferD.append( cudart.cudaMalloc(bufferH[i].nbytes)[1] )
 
-    for i in range(nInput):
-        cudart.cudaMemcpy(bufferD[i], bufferH[i].ctypes.data, bufferH[i].nbytes, cudart.cudaMemcpyKind.cudaMemcpyHostToDevice)
+        for i in range(nInput):
+            cudart.cudaMemcpy(bufferD[i], bufferH[i].ctypes.data, bufferH[i].nbytes, cudart.cudaMemcpyKind.cudaMemcpyHostToDevice)
 
-    context.execute_v2(bufferD)
-
-    for i in range(nInput, nInput + nOutput):
-        cudart.cudaMemcpy(bufferH[i].ctypes.data, bufferD[i], bufferH[i].nbytes, cudart.cudaMemcpyKind.cudaMemcpyDeviceToHost)
-
-    # warm up
-    for i in range(10):
         context.execute_v2(bufferD)
 
-    # test infernece time
-    t0 = time_ns()
-    for i in range(30):
-        context.execute_v2(bufferD)
-    t1 = time_ns()
-    timePerInference = (t1-t0)/1000/1000/30
+        for i in range(nInput, nInput + nOutput):
+            cudart.cudaMemcpy(bufferH[i].ctypes.data, bufferD[i], bufferH[i].nbytes, cudart.cudaMemcpyKind.cudaMemcpyDeviceToHost)
 
-    index_output = engine.get_binding_index("outputs")
-    output = bufferH[index_output]
+        # warm up
+        for i in range(10):
+            context.execute_v2(bufferD)
 
-    gt_data = np.load(path.replace(".png", ".npz"))
-    gt_output = gt_data["output"]
-    check_res = check(output, gt_output, True)
-    print(output.shape)
-    string = "%4d,%4d,%8.3f,%9.3e,%9.3e"%(h_old, w_old, timePerInference, check_res[1], check_res[2])
-    print(string + ", %s"%("Good" if check_res[1] < 1e-4 and check_res[2] < 1e-4 else "Bad"))
+        # test infernece time
+        t0 = time_ns()
+        for i in range(30):
+            context.execute_v2(bufferD)
+        t1 = time_ns()
+        timePerInference = (t1-t0)/1000/1000/30
 
-    # output = output[..., :h_old * scale, :w_old * scale]
+        index_output = engine.get_binding_index("outputs")
+        output = bufferH[index_output]
 
-    # # save image
-    # output = np.clip(np.squeeze(output), 0.0, 1.0)
-    # if output.ndim == 3:
-    #     output = np.transpose(output[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
-    # output = (output * 255.0).round().astype(np.uint8)  # float32 to uint8
+        gt_data = np.load(path.replace(".png", ".npz"))
+        gt_output = gt_data["output"]
+        check_res = check(output, gt_output, True)
+        print(output.shape)
+        string = "%4d,%4d,%8.3f,%9.3e,%9.3e"%(h_old, w_old, timePerInference, check_res[1], check_res[2])
+        print(string + ", %s"%("Good" if check_res[1] < 1e-4 and check_res[2] < 1e-4 else "Bad"))
 
-    # # evaluate psnr/ssim/psnr_b
-    # if img_gt is not None:
-    #     img_gt = (img_gt * 255.0).round().astype(np.uint8)  # float32 to uint8
-    #     img_gt = img_gt[:h_old * scale, :w_old * scale, ...]  # crop gt
-    #     img_gt = np.squeeze(img_gt)
+        # output = output[..., :h_old * scale, :w_old * scale]
 
-    #     psnr = calculate_psnr(output, img_gt, crop_border=border)
-    #     ssim = calculate_ssim(output, img_gt, crop_border=border)
-    #     test_results['psnr'].append(psnr)
-    #     test_results['ssim'].append(ssim)
-    #     if img_gt.ndim == 3:  # RGB image
-    #         psnr_y = calculate_psnr(output, img_gt, crop_border=border, test_y_channel=True)
-    #         ssim_y = calculate_ssim(output, img_gt, crop_border=border, test_y_channel=True)
-    #         test_results['psnr_y'].append(psnr_y)
-    #         test_results['ssim_y'].append(ssim_y)
-    #     print('Testing {:d} {:20s} - PSNR: {:.2f} dB; SSIM: {:.4f}; '
-    #             'PSNR_Y: {:.2f} dB; SSIM_Y: {:.4f}; '
-    #             'PSNR_B: {:.2f} dB.; Inference time: {:.2f}'.
-    #             format(idx, imgname, psnr, ssim, psnr_y, ssim_y, psnr_b, timePerInference))
-    # else:
-    #     print('Testing {:d} {:20s}'.format(idx, imgname))
+        # # save image
+        # output = np.clip(np.squeeze(output), 0.0, 1.0)
+        # if output.ndim == 3:
+        #     output = np.transpose(output[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
+        # output = (output * 255.0).round().astype(np.uint8)  # float32 to uint8
+
+        # # evaluate psnr/ssim/psnr_b
+        # if img_gt is not None:
+        #     img_gt = (img_gt * 255.0).round().astype(np.uint8)  # float32 to uint8
+        #     img_gt = img_gt[:h_old * scale, :w_old * scale, ...]  # crop gt
+        #     img_gt = np.squeeze(img_gt)
+
+        #     psnr = calculate_psnr(output, img_gt, crop_border=border)
+        #     ssim = calculate_ssim(output, img_gt, crop_border=border)
+        #     test_results['psnr'].append(psnr)
+        #     test_results['ssim'].append(ssim)
+        #     if img_gt.ndim == 3:  # RGB image
+        #         psnr_y = calculate_psnr(output, img_gt, crop_border=border, test_y_channel=True)
+        #         ssim_y = calculate_ssim(output, img_gt, crop_border=border, test_y_channel=True)
+        #         test_results['psnr_y'].append(psnr_y)
+        #         test_results['ssim_y'].append(ssim_y)
+        #     print('Testing {:d} {:20s} - PSNR: {:.2f} dB; SSIM: {:.4f}; '
+        #             'PSNR_Y: {:.2f} dB; SSIM_Y: {:.4f}; '
+        #             'PSNR_B: {:.2f} dB.; Inference time: {:.2f}'.
+        #             format(idx, imgname, psnr, ssim, psnr_y, ssim_y, psnr_b, timePerInference))
+        # else:
+        #     print('Testing {:d} {:20s}'.format(idx, imgname))
+
+if __name__ == "__main__":
+    testTRT()
