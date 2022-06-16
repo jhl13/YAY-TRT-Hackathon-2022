@@ -44,6 +44,9 @@ int32_t LayerNormPlugin::enqueue(const PluginTensorDesc *inputDesc, const Plugin
     case 60:
         (layerNormKernel<float, 60>)<<<nBlock, nValuePerBlock, 0, stream>>>((float *)inputs[0], (float *)inputs[1], (float *)inputs[2], (float *)outputs[0]);
         break;
+    case 180:
+        (layerNormKernel<float, 180>)<<<nBlock, nValuePerBlock, 0, stream>>>((float *)inputs[0], (float *)inputs[1], (float *)inputs[2], (float *)outputs[0]);
+        break;
     default: // shoulf NOT be here
         printf("[LayerNormPlugin::enqueue] nValuePerBlock = %d is not supported\n", nValuePerBlock);
         break;

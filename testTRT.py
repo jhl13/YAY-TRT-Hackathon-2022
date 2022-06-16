@@ -277,12 +277,12 @@ def check(a, b, weak=False, epsilon = 1e-5):
     return res, diff0, diff1
 
 
-graph = gs.import_onnx(onnx.load("onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.onnx"))
+graph = gs.import_onnx(onnx.load("onnx_zoo/swinir_classical_sr_x2/001_classicalSR_DF2K_s64w8_SwinIR-M_x2_surgeon.onnx"))
 print("graph nodes: ", len(graph.nodes))
 
 folder_lq = "testsets/Set5/LR_bicubic/X2"
 folder_gt = "testsets/Set5/HR"
-plan_file = "onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.plan"
+plan_file = "onnx_zoo/swinir_classical_sr_x2/001_classicalSR_DF2K_s64w8_SwinIR-M_x2_surgeon.plan"
 plugin_path = "plugin/"
 soFileList = glob(plugin_path + "*.so")
 task = "lightweight_sr"

@@ -3,15 +3,18 @@ import onnx_graphsurgeon as gs
 import numpy as np
 
 # 读取 .onnx 并进行调整
-graph = gs.import_onnx(onnx.load("./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.onnx"))
+graph = gs.import_onnx(onnx.load("./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_DF2K_s64w8_SwinIR-M_x2.onnx"))
 
 ConstantOfShapeNode = None
 ShapeNode = None
 ScatterNDNode = None
+ConvNode = None
+ReshapeNode = None
 
 nFill = 0
 nWindowsMask = 0
 nLayerNorm = 0
+nReshapeIn2 = 0
 for node_id, node in enumerate(graph.nodes):
     if node.op == 'Sub' and node.o().op == "Equal" and \
         node.o().o().op == "Not" and \
@@ -32,6 +35,10 @@ for node_id, node in enumerate(graph.nodes):
         ShapeNode = node
     if node.name == "ScatterND_1080": # ScatterND_1025 ScatterND_1080
         ScatterNDNode = node
+    if node.name == "Conv_50":
+        ConvNode = node
+    if node.name == "Reshape_99": # Reshape_2521 Reshape_99
+        ReshapeNode = node
 
     if node.op == 'ReduceMean' and \
         node.o().op == 'Sub' and node.o().inputs[0] == node.inputs[0] and \
@@ -61,10 +68,17 @@ if ConstantOfShapeNode is not None and ShapeNode is not None and ScatterNDNode i
     nWindowsMask += 1
     ScatterNDNode.outputs = []
 
+if ConvNode is not None and ReshapeNode is not None:
+    ReshapeIn2N = gs.Node("ReshapeIn2", "ReshapeIn2-" + str(nReshapeIn2), inputs=[ReshapeNode.inputs[0], ConvNode.outputs[0]], outputs=[ReshapeNode.outputs[0]])
+    graph.nodes.append(ReshapeIn2N)
+    nReshapeIn2 += 1
+    ReshapeNode.outputs = []
+
 print(f"nFill: {nFill}")
 print(f"nWindowsMask: {nWindowsMask}")
 print(f"nLayerNorm: {nLayerNorm}")
+print(f"nReshapeIn2: {nReshapeIn2}")
 
 graph.cleanup().toposort()
-onnx.save(gs.export_onnx(graph), "./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.onnx")
+onnx.save(gs.export_onnx(graph), "./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_DF2K_s64w8_SwinIR-M_x2_surgeon.onnx")
 print(f"surgeon model nodes: {len(graph.nodes)}")

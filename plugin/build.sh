@@ -12,3 +12,8 @@ cd LayerNorm
 make
 mv *.so ../
 cd ..
+
+cd ReshapePlugin
+make
+mv *.so ../
+cd ..
