@@ -39,8 +39,13 @@ def surgeon(onnx_path):
             ScatterNDNode = node
         if node.name == "Conv_50":
             ConvNode = node
-        if node.name == "Reshape_99": # Reshape_2521 Reshape_99
-            ReshapeNode = node
+        # if node.name == "Reshape_2521": # Reshape_2521 Reshape_99
+        #     ReshapeNode = node
+        if node.op == "Reshape" and (node.outputs[0].name == "outputs" or node.o().op == "Conv") and ConvNode is not None:
+            ReshapeIn2N = gs.Node("ReshapeIn2", "ReshapeIn2-" + str(nReshapeIn2), inputs=[node.inputs[0], ConvNode.outputs[0]], outputs=[node.outputs[0]])
+            graph.nodes.append(ReshapeIn2N)
+            nReshapeIn2 += 1
+            node.outputs = []
 
         if node.op == 'ReduceMean' and \
             node.o().op == 'Sub' and node.o().inputs[0] == node.inputs[0] and \
@@ -70,11 +75,11 @@ def surgeon(onnx_path):
         nWindowsMask += 1
         ScatterNDNode.outputs = []
 
-    if ConvNode is not None and ReshapeNode is not None:
-        ReshapeIn2N = gs.Node("ReshapeIn2", "ReshapeIn2-" + str(nReshapeIn2), inputs=[ReshapeNode.inputs[0], ConvNode.outputs[0]], outputs=[ReshapeNode.outputs[0]])
-        graph.nodes.append(ReshapeIn2N)
-        nReshapeIn2 += 1
-        ReshapeNode.outputs = []
+    # if ConvNode is not None and ReshapeNode is not None:
+    #     ReshapeIn2N = gs.Node("ReshapeIn2", "ReshapeIn2-" + str(nReshapeIn2), inputs=[ReshapeNode.inputs[0], ConvNode.outputs[0]], outputs=[ReshapeNode.outputs[0]])
+    #     graph.nodes.append(ReshapeIn2N)
+    #     nReshapeIn2 += 1
+    #     ReshapeNode.outputs = []
 
     print(f"nFill: {nFill}")
     print(f"nWindowsMask: {nWindowsMask}")

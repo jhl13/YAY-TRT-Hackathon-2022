@@ -393,7 +393,8 @@ class BasicLayer(nn.Module):
             self.downsample = None
 
     def forward(self, x, x_size, mask, mask_shift):
-        for i in range(self.depth):
+        # for i in range(self.depth):
+        for i in range(1):
             blk = self.blocks[i]
             if self.use_checkpoint:
                 x = checkpoint.checkpoint(blk, x, x_size)
@@ -481,7 +482,9 @@ class RSTB(nn.Module):
             norm_layer=None)
 
     def forward(self, x, x_size, mask, mask_shift):
-        return self.patch_embed(self.conv(self.patch_unembed(self.residual_group(x, x_size, mask, mask_shift), x_size))) + x
+        return self.patch_embed(self.conv(self.patch_unembed(x, x_size))) + x
+        # return self.residual_group(x, x_size, mask, mask_shift)
+        # return self.patch_embed(self.conv(self.patch_unembed(self.residual_group(x, x_size, mask, mask_shift), x_size))) + x
 
     def flops(self):
         flops = 0
@@ -825,8 +828,8 @@ class SwinIR(nn.Module):
             x = x + self.absolute_pos_embed
         x = self.pos_drop(x)
 
-        # for layer in self.layers[:1]:
-        #     x = layer(x, x_size, mask, mask_shift)
+        for layer in self.layers:
+            x = layer(x, x_size, mask, mask_shift)
 
         x = self.norm(x)  # B L C
         x = self.patch_unembed(x, x_size)
