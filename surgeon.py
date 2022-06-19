@@ -47,6 +47,9 @@ def surgeon(onnx_path):
             graph.nodes.append(ReshapeIn2N)
             nReshapeIn2 += 1
             node.outputs = []
+        
+        if node.name == "Reshape_164":
+            Reshape_164 = node
 
         if node.op == 'ReduceMean' and \
             node.o().op == 'Sub' and node.o().inputs[0] == node.inputs[0] and \
@@ -110,6 +113,11 @@ def surgeon(onnx_path):
     #     graph.nodes.append(ReshapeIn2N)
     #     nReshapeIn2 += 1
     #     ReshapeNode.outputs = []
+
+    ReshapeIn2N = gs.Node("ReshapeIn2", "ReshapeIn2-" + str(nReshapeIn2), inputs=[Reshape_164.inputs[0], ConvNode.outputs[0]], outputs=[Reshape_164.outputs[0]])
+    graph.nodes.append(ReshapeIn2N)
+    nReshapeIn2 += 1
+    Reshape_164.outputs = []
 
     print(f"nFill: {nFill}")
     print(f"nWindowsMask: {nWindowsMask}")
