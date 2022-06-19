@@ -17,3 +17,8 @@ cd ReshapePlugin
 make
 mv *.so ../
 cd ..
+
+cd RollPlugin
+make
+mv *.so ../
+cd ..

@@ -32,7 +32,7 @@
 // +------- Plguin ---------------------------------------------------------------------------------
 namespace
 {
-static const char* PLUGIN_NAME{"LayerNorm"};
+static const char* PLUGIN_NAME{"Roll"};
 static const char* PLUGIN_VERSION{"1"};
 } // namespace
 
@@ -40,26 +40,33 @@ namespace nvinfer1
 {
 
 // +------- Plugin body ----------------------------------------------------------------------------
-class LayerNormPlugin: public IPluginV2DynamicExt
+class RollPlugin: public IPluginV2DynamicExt
 {
 private:    
     std::string name_;
     std::string namespace_;
+    struct{
+        int shift_;
+        int direction_;
+    }m;
 
 public:
-    LayerNormPlugin(const std::string& name) : name_(name)
+    RollPlugin(const std::string& name, int shift, int direction) : name_(name)
     {
+        m.shift_ = shift;
+        m.direction_ = direction;
         WHERE_AM_I();
     }
 
-    LayerNormPlugin(const std::string& name, const void* data, size_t length) : name_(name)
+    RollPlugin(const std::string& name, const void* data, size_t length) : name_(name)
     {
         WHERE_AM_I();
+        memcpy(&m, data, sizeof(m));
     }
     
-    LayerNormPlugin() = delete;
+    RollPlugin() = delete;
 
-    ~LayerNormPlugin()
+    ~RollPlugin()
     {
         WHERE_AM_I();
     }
@@ -67,18 +74,19 @@ public:
     size_t getSerializationSize() const noexcept override
     {
         WHERE_AM_I();
-        return 0;
+        return sizeof(m);
     }
     
     void serialize(void *buffer) const noexcept override
     {
         WHERE_AM_I();
+        memcpy(buffer, &m, sizeof(m));
     }
   
     IPluginV2DynamicExt* clone() const noexcept override
     {
         WHERE_AM_I();
-        return new LayerNormPlugin(name_);
+        return new RollPlugin(name_, m.shift_, m.direction_);
     }
 
     int getNbOutputs() const noexcept override
@@ -108,10 +116,6 @@ public:
             res = (inOut[pos].type == DataType::kFLOAT); break;
         case 1:
             res = (inOut[pos].type == DataType::kFLOAT); break;
-        case 2:
-            res = (inOut[pos].type == DataType::kFLOAT); break;
-        case 3:
-            res = inOut[pos].type == inOut[0].type; break;
         default:// should NOT be here
             res = false;
         }
@@ -172,9 +176,9 @@ public:
     }
     
     int32_t enqueue(const PluginTensorDesc* inputDesc, const PluginTensorDesc* outputDesc, const void* const* inputs, void* const* outputs, void* workspace, cudaStream_t stream) noexcept override;
-}; // class LayerNormPlugin
+}; // class RollPlugin
 
-class LayerNormPluginCreator : public IPluginCreator
+class RollPluginCreator : public IPluginCreator
 {
 private:
     static PluginFieldCollection fc_;
@@ -182,23 +186,39 @@ private:
     std::string namespace_;
 
 public:
-    LayerNormPluginCreator()
+    RollPluginCreator()
     {
+        attr_.emplace_back(PluginField("shift", nullptr, PluginFieldType::kINT32, 1));
+        attr_.emplace_back(PluginField("direction", nullptr, PluginFieldType::kINT32, 1));
         fc_.nbFields = attr_.size();
-        fc_.fields = attr_.data();
+        fc_.fields   = attr_.data();
     }
 
-    ~LayerNormPluginCreator() {}
+    ~RollPluginCreator() {}
 
     IPluginV2* createPlugin(const char* name, const PluginFieldCollection* fc) noexcept override
     {
         WHERE_AM_I();
-        return new LayerNormPlugin(name);
+        int shift {-4};
+        int direction {1};
+        for (int i = 0; i < fc->nbFields; i++)
+        {
+            std::string field_name(fc->fields[i].name);
+            if (field_name.compare("shift") == 0)
+            {
+                shift = *static_cast<const int *>(fc->fields[i].data);
+            }
+            if (field_name.compare("direction") == 0)
+            {
+                direction = *static_cast<const int *>(fc->fields[i].data);
+            }
+        }
+        return new RollPlugin(name, shift, direction);
     }
 
     IPluginV2* deserializePlugin(const char* name, const void* serialData, size_t serialLength) noexcept override
     {
-        return new LayerNormPlugin(name, serialData, serialLength);
+        return new RollPlugin(name, serialData, serialLength);
     }
 
     void setPluginNamespace(const char* szNamespace) noexcept override
@@ -225,7 +245,7 @@ public:
     {
         return &fc_;
     }
-}; // class LayerNormPluginCreator
+}; // class RollPluginCreator
 
 } // namespace nvinfer1
 

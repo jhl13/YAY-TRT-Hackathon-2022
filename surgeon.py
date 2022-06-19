@@ -17,6 +17,7 @@ def surgeon(onnx_path):
     nWindowsMask = 0
     nLayerNorm = 0
     nReshapeIn2 = 0
+    nRoll = 0
     for node_id, node in enumerate(graph.nodes):
         if node.op == 'Sub' and node.o().op == "Equal" and \
             node.o().o().op == "Not" and \
@@ -67,6 +68,35 @@ def surgeon(onnx_path):
             nLayerNorm += 1
             AddNode.outputs = []
 
+        try:
+            if node.op == "Reshape" and node.o().op == "Slice" and \
+                node.o().o().op == "Concat" and node.o().o().o().op == "Slice" and \
+                node.o().o().o().o().op == "Concat":
+                inputTensor = node.outputs[0]
+                midNode = node.o().o()
+                lastNode = node.o().o().o().o()
+                tmpNode1 = node.o().o().o().o().o().o()
+                tmpNode2 = node.o().o().o().o().o().o().o().o()
+                RollN = gs.Node("Roll", "Roll-" + str(nRoll), inputs=[inputTensor], outputs=[midNode.outputs[0]], attrs={"shift": -4, "direction":0})
+                graph.nodes.append(RollN)
+                nRoll += 1
+                RollN = gs.Node("Roll", "Roll-" + str(nRoll), inputs=[midNode.outputs[0]], outputs=[lastNode.outputs[0]], attrs={"shift": -4, "direction":1})
+                graph.nodes.append(RollN)
+                nRoll += 1
+                midNode.outputs = []
+                lastNode.outputs = []
+
+                RollN = gs.Node("Roll", "Roll-" + str(nRoll), inputs=[RollN.outputs[0]], outputs=[tmpNode1.outputs[0]], attrs={"shift": 4, "direction":0})
+                graph.nodes.append(RollN)
+                nRoll += 1
+                RollN = gs.Node("Roll", "Roll-" + str(nRoll), inputs=[tmpNode1.outputs[0]], outputs=[tmpNode2.outputs[0]], attrs={"shift": 4, "direction":1})
+                graph.nodes.append(RollN)
+                nRoll += 1
+                tmpNode1.outputs = []
+                tmpNode2.outputs = []
+        except:
+            pass
+
     if ConstantOfShapeNode is not None and ShapeNode is not None and ScatterNDNode is not None:
         img_mask = ConstantOfShapeNode.outputs[0]
         img_mask_shape = ShapeNode.outputs[0]
@@ -85,6 +115,7 @@ def surgeon(onnx_path):
     print(f"nWindowsMask: {nWindowsMask}")
     print(f"nLayerNorm: {nLayerNorm}")
     print(f"nReshapeIn2: {nReshapeIn2}")
+    print(f"nRoll: {nRoll}")
 
     graph.cleanup().toposort()
     surgeon_onnx_path = onnx_path.replace(".onnx", "_surgeon.onnx")
