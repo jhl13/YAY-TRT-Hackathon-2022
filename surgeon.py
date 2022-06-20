@@ -11,7 +11,7 @@ def surgeon(onnx_path):
     ShapeNode = None
     ScatterNDNode = None
     ConvNode = None
-    ReshapeNode = None
+    FirstLayerNormNode = None
 
     nFill = 0
     nWindowsMask = 0
@@ -40,16 +40,12 @@ def surgeon(onnx_path):
             ScatterNDNode = node
         if node.name == "Conv_50":
             ConvNode = node
-        # if node.name == "Reshape_2521": # Reshape_2521 Reshape_99
-        #     ReshapeNode = node
+
         if node.op == "Reshape" and (node.outputs[0].name == "outputs" or node.o().op == "Conv") and ConvNode is not None:
             ReshapeIn2N = gs.Node("ReshapeIn2", "ReshapeIn2-" + str(nReshapeIn2), inputs=[node.inputs[0], ConvNode.outputs[0]], outputs=[node.outputs[0]])
             graph.nodes.append(ReshapeIn2N)
             nReshapeIn2 += 1
             node.outputs = []
-        
-        if node.name == "Reshape_164":
-            Reshape_164 = node
 
         if node.op == 'ReduceMean' and \
             node.o().op == 'Sub' and node.o().inputs[0] == node.inputs[0] and \
@@ -70,6 +66,8 @@ def surgeon(onnx_path):
             graph.nodes.append(layerNormN)
             nLayerNorm += 1
             AddNode.outputs = []
+            if FirstLayerNormNode is None:
+                FirstLayerNormNode = layerNormN
 
         try:
             if node.op == "Reshape" and node.o().op == "Slice" and \
@@ -108,16 +106,29 @@ def surgeon(onnx_path):
         nWindowsMask += 1
         ScatterNDNode.outputs = []
 
-    # if ConvNode is not None and ReshapeNode is not None:
-    #     ReshapeIn2N = gs.Node("ReshapeIn2", "ReshapeIn2-" + str(nReshapeIn2), inputs=[ReshapeNode.inputs[0], ConvNode.outputs[0]], outputs=[ReshapeNode.outputs[0]])
-    #     graph.nodes.append(ReshapeIn2N)
-    #     nReshapeIn2 += 1
-    #     ReshapeNode.outputs = []
+    graph.cleanup().toposort()
 
-    ReshapeIn2N = gs.Node("ReshapeIn2", "ReshapeIn2-" + str(nReshapeIn2), inputs=[Reshape_164.inputs[0], ConvNode.outputs[0]], outputs=[Reshape_164.outputs[0]])
-    graph.nodes.append(ReshapeIn2N)
-    nReshapeIn2 += 1
-    Reshape_164.outputs = []
+    for node_id, node in enumerate(graph.nodes):
+        # ReshapeIn2 挺慢的
+        if node.op == "Reshape" and len(node.outputs) > 0 and node.o().op == "Roll":
+            ReshapeIn2N = gs.Node("ReshapeIn2", "ReshapeIn2-" + str(nReshapeIn2), inputs=[node.inputs[0], ConvNode.outputs[0]], outputs=[node.outputs[0]])
+            graph.nodes.append(ReshapeIn2N)
+            nReshapeIn2 += 1
+            node.outputs = []
+        
+        # if node.op == "Roll" and node.o().op == "Reshape":
+        #     reshapeN = node.o()
+        #     ReshapeIn2N = gs.Node("ReshapeIn2", "ReshapeIn2-" + str(nReshapeIn2), inputs=[reshapeN.inputs[0], FirstLayerNormNode.outputs[0]], outputs=[reshapeN.outputs[0]])
+        #     graph.nodes.append(ReshapeIn2N)
+        #     nReshapeIn2 += 1
+        #     reshapeN.outputs = []
+        
+        # if node.op == "LayerNorm" and node.o().op == "Reshape":
+        #     reshapeN = node.o()
+        #     ReshapeIn2N = gs.Node("ReshapeIn2", "ReshapeIn2-" + str(nReshapeIn2), inputs=[reshapeN.inputs[0], ConvNode.outputs[0]], outputs=[reshapeN.outputs[0]])
+        #     graph.nodes.append(ReshapeIn2N)
+        #     nReshapeIn2 += 1
+        #     reshapeN.outputs = []
 
     print(f"nFill: {nFill}")
     print(f"nWindowsMask: {nWindowsMask}")

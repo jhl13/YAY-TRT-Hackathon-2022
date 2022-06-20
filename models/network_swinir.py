@@ -392,8 +392,7 @@ class BasicLayer(nn.Module):
             self.downsample = None
 
     def forward(self, x, x_size, mask, mask_shift):
-        # for i in range(self.depth):
-        for i in range(2):
+        for i in range(self.depth):
             blk = self.blocks[i]
             if self.use_checkpoint:
                 x = checkpoint.checkpoint(blk, x, x_size)
