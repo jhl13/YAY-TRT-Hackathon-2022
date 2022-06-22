@@ -14,14 +14,14 @@
  * limitations under the License.
  */
  
- #include "ReshapeIn2Plugin.h"
+ #include "STReshapePlugin.h"
 
 using namespace nvinfer1;
 
-PluginFieldCollection ReshapeIn2PluginCreator::fc_{};
-std::vector<PluginField> ReshapeIn2PluginCreator::attr_;
+PluginFieldCollection STReshapePluginCreator::fc_{};
+std::vector<PluginField> STReshapePluginCreator::attr_;
 
-__global__ void ReshapeIn2Kernel(float *pInput, float *pOutput, int nElement)
+__global__ void STReshapeKernel(float *pInput, float *pOutput, int nElement)
 {
     const int index = blockIdx.x * 256 + threadIdx.x;
     if (index > nElement){
@@ -30,7 +30,7 @@ __global__ void ReshapeIn2Kernel(float *pInput, float *pOutput, int nElement)
     pOutput[index] = pInput[index];
 }
 
-int32_t ReshapeIn2Plugin::enqueue(const PluginTensorDesc* inputDesc, const PluginTensorDesc* outputDesc, const void* const* inputs, void* const* outputs, void* workspace, cudaStream_t stream) noexcept
+int32_t STReshapePlugin::enqueue(const PluginTensorDesc* inputDesc, const PluginTensorDesc* outputDesc, const void* const* inputs, void* const* outputs, void* workspace, cudaStream_t stream) noexcept
 {
     int nElement = 1;
     for (int i = 0; i < inputDesc[0].dims.nbDims; i++)
@@ -39,9 +39,9 @@ int32_t ReshapeIn2Plugin::enqueue(const PluginTensorDesc* inputDesc, const Plugi
     }
 
     dim3 grid(CEIL_DIVIDE(nElement, 256), 1, 1), block(256, 1, 1); 
-    ReshapeIn2Kernel <<<grid, block, 0, stream>>>((float *)inputs[0], (float *)outputs[0], nElement);
+    STReshapeKernel <<<grid, block, 0, stream>>>((float *)inputs[0], (float *)outputs[0], nElement);
     return 0;
 }
 
-REGISTER_TENSORRT_PLUGIN(ReshapeIn2PluginCreator);
+REGISTER_TENSORRT_PLUGIN(STReshapePluginCreator);
 

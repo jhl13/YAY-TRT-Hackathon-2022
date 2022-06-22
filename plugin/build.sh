@@ -13,7 +13,7 @@ make
 mv *.so ../
 cd ..
 
-cd ReshapePlugin
+cd STReshapePlugin
 make
 mv *.so ../
 cd ..
