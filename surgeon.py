@@ -76,38 +76,6 @@ def surgeon(onnx_path):
     # graph.cleanup().toposort()
 
     for node_id, node in enumerate(graph.nodes):
-        # if node.op == "LayerNorm" and node.o().op == "Reshape" and len(node.o().outputs) > 0 and \
-        #     node.o().outputs[0].name != "outputs" and node.o().o().op == "Slice" and \
-        #     node.o().o().o().op == "Concat" and node.o().o().o().o().op == "Slice" and \
-        #     node.o().o().o().o().o().op == "Concat":
-        #     inputTensor = node.o().outputs[0]
-        #     midNode = node.o().o().o()
-        #     lastNode = node.o().o().o().o().o()
-        #     RollN = gs.Node("Roll", "Roll-" + str(nRoll), inputs=[inputTensor], outputs=[midNode.outputs[0]], attrs={"shift": -4, "direction":0})
-        #     graph.nodes.append(RollN)
-        #     nRoll += 1
-        #     RollN = gs.Node("Roll", "Roll-" + str(nRoll), inputs=[midNode.outputs[0]], outputs=[lastNode.outputs[0]], attrs={"shift": -4, "direction":1})
-        #     graph.nodes.append(RollN)
-        #     nRoll += 1
-        #     midNode.outputs = []
-        #     lastNode.outputs = []
-
-        # if node.op == "Transpose" and node.o().op == "Reshape" and len(node.o().outputs) > 0 and \
-        #     node.o().outputs[0].name != "outputs" and node.o().o().op == "Slice" and \
-        #     node.o().o().o().op == "Concat" and node.o().o().o().o().op == "Slice" and \
-        #     node.o().o().o().o().o().op == "Concat":
-        #     inputTensor = node.o().outputs[0]
-        #     midNode = node.o().o().o()
-        #     lastNode = node.o().o().o().o().o()
-        #     RollN = gs.Node("Roll", "Roll-" + str(nRoll), inputs=[inputTensor], outputs=[midNode.outputs[0]], attrs={"shift": 4, "direction":0})
-        #     graph.nodes.append(RollN)
-        #     nRoll += 1
-        #     RollN = gs.Node("Roll", "Roll-" + str(nRoll), inputs=[midNode.outputs[0]], outputs=[lastNode.outputs[0]], attrs={"shift": 4, "direction":1})
-        #     graph.nodes.append(RollN)
-        #     nRoll += 1
-        #     midNode.outputs = []
-        #     lastNode.outputs = []
-
         # without shift
         if node.op == "LayerNorm" and node.outputs[0].name != "outputs" and \
                 node.o().op == "Reshape" and node.o().o().op != "Slice" and node.o().o(4).op == "Reshape":
@@ -149,7 +117,7 @@ def surgeon(onnx_path):
             nSTReshapeRoll += 1
             LastN.outputs = []
 
-        # shift 可不用
+        # shift
         if node.op == "Reshape" and len(node.outputs) > 0 and node.o().op == "Slice" and \
                 node.o().o().op == "Concat" and node.o().o().o().op == "Slice" and \
                 node.o().o().o().o().op == "Concat" and node.o().o().o().o().o().op == "Reshape" and \

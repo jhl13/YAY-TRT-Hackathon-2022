@@ -18,7 +18,7 @@ make
 mv *.so ../
 cd ..
 
-cd RollPlugin
+cd STReshapeRoll
 make
 mv *.so ../
 cd ..

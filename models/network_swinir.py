@@ -393,7 +393,7 @@ class BasicLayer(nn.Module):
             self.downsample = None
 
     def forward(self, x, x_size, mask, mask_shift):
-        for i in range(2): # x_windows
+        for i in range(self.depth): # x_windows
             blk = self.blocks[i]
             if self.use_checkpoint:
                 x = checkpoint.checkpoint(blk, x, x_size)
@@ -826,7 +826,7 @@ class SwinIR(nn.Module):
             x = x + self.absolute_pos_embed
         x = self.pos_drop(x)
 
-        for layer in self.layers[:1]:
+        for layer in self.layers:
             x = layer(x, x_size, mask, mask_shift)
 
         # x = self.norm(x)  # B L C
