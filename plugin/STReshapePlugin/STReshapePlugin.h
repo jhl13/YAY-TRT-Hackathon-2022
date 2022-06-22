@@ -138,6 +138,9 @@ public:
             out.d[4]   = exprBuilder.constant(m.window_size_);
             out.d[5]   = inputs[1].d[1];
         }
+        else if (m.type_ == 4){
+            return inputs[1];
+        }
         return out;
     }
 

@@ -481,8 +481,7 @@ class RSTB(nn.Module):
             norm_layer=None)
 
     def forward(self, x, x_size, mask, mask_shift):
-        return self.residual_group(x, x_size, mask, mask_shift)
-        # return self.patch_embed(self.conv(self.patch_unembed(self.residual_group(x, x_size, mask, mask_shift), x_size))) + x
+        return self.patch_embed(self.conv(self.patch_unembed(self.residual_group(x, x_size, mask, mask_shift), x_size))) + x
 
     def flops(self):
         flops = 0
@@ -829,8 +828,8 @@ class SwinIR(nn.Module):
         for layer in self.layers:
             x = layer(x, x_size, mask, mask_shift)
 
-        # x = self.norm(x)  # B L C
-        # x = self.patch_unembed(x, x_size)
+        x = self.norm(x)  # B L C
+        x = self.patch_unembed(x, x_size)
         return x
 
     def forward(self, x):
@@ -848,16 +847,12 @@ class SwinIR(nn.Module):
         if self.upsampler == 'pixelshuffle':
             # for classical SR
             x = self.conv_first(x)
-            x = self.forward_features(x)
-            return x
             x = self.conv_after_body(self.forward_features(x)) + x
             x = self.conv_before_upsample(x)
             x = self.conv_last(self.upsample(x))
         elif self.upsampler == 'pixelshuffledirect':
             # for lightweight SR
             x = self.conv_first(x)
-            x = self.forward_features(x)
-            return x
             x = self.conv_after_body(self.forward_features(x)) + x
             x = self.upsample(x)
         elif self.upsampler == 'nearest+conv':
@@ -876,7 +871,6 @@ class SwinIR(nn.Module):
             x = x + self.conv_last(res)
 
         x = x / self.img_range + self.mean
-
         return x[:, :, :H*self.upscale, :W*self.upscale]
 
     def flops(self):

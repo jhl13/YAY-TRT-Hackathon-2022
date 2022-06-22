@@ -17,7 +17,6 @@ def surgeon(onnx_path):
     nWindowsMask = 0
     nLayerNorm = 0
     nSTReshape = 0
-    nRoll = 0
     nSTReshapeRoll = 0
     for node_id, node in enumerate(graph.nodes):
         if node.name == "ConstantOfShape_117": # ConstantOfShape_62 ConstantOfShape_117
@@ -26,7 +25,7 @@ def surgeon(onnx_path):
             ShapeNode = node
         if node.name == "ScatterND_1080": # ScatterND_1025 ScatterND_1080
             ScatterNDNode = node
-        if node.name == "Conv_50":
+        if node.name == "Conv_56": # Conv_50
             ConvNode = node
 
         if node.op == 'ReduceMean' and \
@@ -90,7 +89,7 @@ def surgeon(onnx_path):
             LastN.outputs = []
 
         # without shift 可不用
-        if node.op == "Reshape" and len(node.outputs) > 0  and node.o().op == "Reshape" and \
+        if node.op == "Reshape" and len(node.outputs) > 0  and node.outputs[0].name != "outputs" and node.o().op == "Reshape" and \
                 node.o().o().op == "Add" and node.o().o().o(1).op == "LayerNorm":
             reshapeN = node
             LastN = node.o()
@@ -103,7 +102,7 @@ def surgeon(onnx_path):
             LastN.outputs = []
 
         # shift
-        if node.op == "LayerNorm" and node.o().op == "Reshape"  and \
+        if node.op == "LayerNorm" and node.outputs[0].name != "outputs" and node.o().op == "Reshape"  and \
                 len(node.o().outputs) > 0 and node.o().o().op == "Slice" and \
                 node.o().o().o().op == "Concat" and node.o().o().o().o().op == "Slice" and \
                 node.o().o().o().o().o().op == "Concat" and node.o().o().o().o().o().o(4).op == "Reshape":
@@ -118,7 +117,7 @@ def surgeon(onnx_path):
             LastN.outputs = []
 
         # shift
-        if node.op == "Reshape" and len(node.outputs) > 0 and node.o().op == "Slice" and \
+        if node.op == "Reshape" and len(node.outputs) > 0 and node.outputs[0].name != "outputs" and node.o().op == "Slice" and \
                 node.o().o().op == "Concat" and node.o().o().o().op == "Slice" and \
                 node.o().o().o().o().op == "Concat" and node.o().o().o().o().o().op == "Reshape" and \
                 node.o().o().o().o().o().o().op == "Add" and node.o().o().o().o().o().o().o(1).op == "LayerNorm":
@@ -135,7 +134,9 @@ def surgeon(onnx_path):
 
     for node_id, node in enumerate(graph.nodes):
         # 可不用
-        if node.op == "Transpose" and node.o().op == "Reshape" and node.o().o().op == "Reshape":
+        if node.op == "Transpose" and node.o().op == "Reshape" and \
+            len(node.o().outputs) > 0 and node.o().outputs[0].name != "outputs" and \
+            node.o().o().op == "Reshape":
             FirstN = node.o()
             LastN = node.o().o()
             STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
@@ -146,7 +147,7 @@ def surgeon(onnx_path):
             nSTReshape += 1
             LastN.outputs = []
 
-        if node.op == "Reshape" and len(node.outputs) > 0 and \
+        if node.op == "Reshape" and len(node.outputs) > 0 and node.outputs[0].name != "outputs" and \
                 node.o().op == "Reshape" and len(node.o().outputs) > 0 and node.o().o().op == "Transpose":
             FirstN = node
             LastN = node.o()
@@ -157,14 +158,22 @@ def surgeon(onnx_path):
             graph.nodes.append(STReshapeN)
             nSTReshape += 1
             LastN.outputs = []
-        
-        
+    graph.cleanup().toposort()
+
+    for node_id, node in enumerate(graph.nodes):
+        if node.op == "Reshape" and node.o().op == "Conv":
+            STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
+                                    inputs=[node.inputs[0], ConvNode.outputs[0]], 
+                                    outputs=[node.outputs[0]],
+                                    attrs={"type":4, "window_size":8})
+            graph.nodes.append(STReshapeN)
+            nSTReshape += 1
+            node.outputs = []
 
     print(f"nFill: {nFill}")
     print(f"nWindowsMask: {nWindowsMask}")
     print(f"nLayerNorm: {nLayerNorm}")
     print(f"nSTReshape: {nSTReshape}")
-    print(f"nRoll: {nRoll}")
     print(f"nSTReshapeRoll: {nSTReshapeRoll}")
 
     graph.cleanup().toposort()
