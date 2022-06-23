@@ -62,7 +62,7 @@ def export():
                      input_names=['images'],
                      output_names=['outputs'],
                      dynamic_axes={'images': {0: 'batch', 2: 'height', 3: 'width'},
-                                    'outputs': {0: 'batch', 1:"dim1"}
+                                    'outputs': {0: 'batch', 2: 'height_out', 3: 'width_out'},
                                   }
                     )
 

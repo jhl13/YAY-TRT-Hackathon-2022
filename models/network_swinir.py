@@ -254,8 +254,8 @@ class SwinTransformerBlock(nn.Module):
         x_windows = window_partition(shifted_x, self.window_size, C)  # nW*B, window_size, window_size, C
         x_windows = x_windows.view(-1, self.window_size * self.window_size, C)  # nW*B, window_size*window_size, C
 
-        # attn_windows = self.attn(x_windows, mask=mask)
-        attn_windows = x_windows
+        attn_windows = self.attn(x_windows, mask=mask)
+        # attn_windows = x_windows
 
         # merge windows
         attn_windows = attn_windows.view(-1, self.window_size, self.window_size, C)
@@ -393,7 +393,7 @@ class BasicLayer(nn.Module):
             self.downsample = None
 
     def forward(self, x, x_size, mask, mask_shift):
-        for i in range(self.depth): # x_windows
+        for i in range(1): # x_windows
             blk = self.blocks[i]
             if self.use_checkpoint:
                 x = checkpoint.checkpoint(blk, x, x_size)
@@ -825,7 +825,7 @@ class SwinIR(nn.Module):
             x = x + self.absolute_pos_embed
         x = self.pos_drop(x)
 
-        for layer in self.layers:
+        for layer in self.layers[:1]:
             x = layer(x, x_size, mask, mask_shift)
 
         x = self.norm(x)  # B L C

@@ -19,7 +19,6 @@
 #include <string>
 #include <vector>
 
-
 // +------- Debug wrapper --------------------------------------------------------------------------
 #if DEBUG
 #define WHERE_AM_I() do {printf("[%s]: this=->%p\n",__func__,this);} while(0);
@@ -33,7 +32,7 @@
 // +------- Plguin ---------------------------------------------------------------------------------
 namespace
 {
-static const char* PLUGIN_NAME{"STReshape"};
+static const char* PLUGIN_NAME{"STReshapeAdd"};
 static const char* PLUGIN_VERSION{"1"};
 } // namespace
 
@@ -41,36 +40,35 @@ namespace nvinfer1
 {
 
 // +------- Plugin body ----------------------------------------------------------------------------
-class STReshapePlugin: public IPluginV2DynamicExt
+class STReshapeAddPlugin: public IPluginV2DynamicExt
 {
 private:    
     std::string name_;
     std::string namespace_;
     struct{
+        int shift_;
         int window_size_;
         int type_;
-        int num_heads_;
     }m;
-    
 
 public:
-    STReshapePlugin(const std::string& name, int window_size, int type, int num_heads) : name_(name)
+    STReshapeAddPlugin(const std::string& name, int shift, int window_size, int type) : name_(name)
     {
+        m.shift_ = shift;
         m.window_size_ = window_size;
-        m.type_        = type;
-        m.num_heads_   = num_heads;
+        m.type_ = type;
         WHERE_AM_I();
     }
 
-    STReshapePlugin(const std::string& name, const void* data, size_t length) : name_(name)
+    STReshapeAddPlugin(const std::string& name, const void* data, size_t length) : name_(name)
     {
         WHERE_AM_I();
         memcpy(&m, data, sizeof(m));
     }
     
-    STReshapePlugin() = delete;
+    STReshapeAddPlugin() = delete;
 
-    ~STReshapePlugin()
+    ~STReshapeAddPlugin()
     {
         WHERE_AM_I();
     }
@@ -90,7 +88,7 @@ public:
     IPluginV2DynamicExt* clone() const noexcept override
     {
         WHERE_AM_I();
-        return new STReshapePlugin(name_, m.window_size_, m.type_, m.num_heads_);
+        return new STReshapeAddPlugin(name_, m.shift_, m.window_size_, m.type_);
     }
 
     int getNbOutputs() const noexcept override
@@ -102,64 +100,7 @@ public:
     DimsExprs getOutputDimensions(int32_t outputIndex, const DimsExprs* inputs, int32_t nbInputs, IExprBuilder& exprBuilder) noexcept override
     {
         WHERE_AM_I();
-        DimsExprs out;
-        const auto* ws = exprBuilder.constant(m.window_size_);
-        const auto* nh = exprBuilder.constant(m.num_heads_);
-        const auto* wspow2 = exprBuilder.constant(m.window_size_*m.window_size_);
-        
-        // B, H, W, C without shift
-        if (m.type_ == 0){
-            out.nbDims = 6;
-            out.d[0]   = inputs[1].d[0];
-            out.d[1]   = exprBuilder.operation(DimensionOperation::kFLOOR_DIV, *inputs[1].d[2], *ws);
-            out.d[2]   = exprBuilder.constant(m.window_size_);
-            out.d[3]   = exprBuilder.operation(DimensionOperation::kFLOOR_DIV, *inputs[1].d[3], *ws);
-            out.d[4]   = exprBuilder.constant(m.window_size_);
-            out.d[5]   = inputs[1].d[1];
-        }
-        // B, H*W, C without shift
-        else if (m.type_ == 1){
-            out.nbDims = 3;
-            out.d[0]   = inputs[1].d[0];
-            out.d[1]   = inputs[1].d[1];
-            out.d[2]   = inputs[1].d[2];
-        }
-        // -1, window_size*window_size, C
-        if (m.type_ == 2){
-            out.nbDims = 3;
-            const auto* tmp = exprBuilder.operation(DimensionOperation::kPROD, *inputs[1].d[0], *inputs[1].d[1]);
-            out.d[0]   = exprBuilder.operation(DimensionOperation::kFLOOR_DIV, *tmp, *wspow2);
-            out.d[1]   = exprBuilder.constant(m.window_size_*m.window_size_);
-            out.d[2]   = inputs[1].d[2];
-        }
-        // B, H // window_szie, W // window_size, window_size, window_size, C
-        else if (m.type_ == 3){
-            out.nbDims = 6;
-            out.d[0]   = inputs[1].d[0];
-            out.d[1]   = exprBuilder.operation(DimensionOperation::kFLOOR_DIV, *inputs[1].d[2], *ws);
-            out.d[2]   = exprBuilder.operation(DimensionOperation::kFLOOR_DIV, *inputs[1].d[3], *ws);
-            out.d[3]   = exprBuilder.constant(m.window_size_);
-            out.d[4]   = exprBuilder.constant(m.window_size_);
-            out.d[5]   = inputs[1].d[1];
-        }
-        // B, C, H, W
-        else if (m.type_ == 4){
-            return inputs[1];
-        }
-        // -1, window_szie*window_szie, 3, num_heads, C // num_heads
-        else if (m.type_ == 5){
-            out.nbDims = 5;
-            out.d[0]   = inputs[1].d[0];
-            out.d[1]   = inputs[1].d[1];
-            out.d[2]   = exprBuilder.constant(3);
-            out.d[3]   = exprBuilder.constant(m.num_heads_);
-            out.d[4]   = exprBuilder.operation(DimensionOperation::kFLOOR_DIV, *inputs[1].d[2], *nh);
-        }
-        // , window_szie*window_szie, C
-        else if (m.type_ == 6){
-            return inputs[1];
-        }
-        return out;
+        return inputs[0];
     }
 
     bool supportsFormatCombination(int32_t pos, const PluginTensorDesc* inOut, int32_t nbInputs, int32_t nbOutputs) noexcept override
@@ -239,9 +180,9 @@ public:
     }
     
     int32_t enqueue(const PluginTensorDesc* inputDesc, const PluginTensorDesc* outputDesc, const void* const* inputs, void* const* outputs, void* workspace, cudaStream_t stream) noexcept override;
-}; // class STReshapePlugin
+}; // class STReshapeAddPlugin
 
-class STReshapePluginCreator : public IPluginCreator
+class STReshapeAddPluginCreator : public IPluginCreator
 {
 private:
     static PluginFieldCollection fc_;
@@ -249,26 +190,30 @@ private:
     std::string namespace_;
 
 public:
-    STReshapePluginCreator()
+    STReshapeAddPluginCreator()
     {
+        attr_.emplace_back(PluginField("shift", nullptr, PluginFieldType::kINT32, 1));
         attr_.emplace_back(PluginField("window_size", nullptr, PluginFieldType::kINT32, 1));
         attr_.emplace_back(PluginField("type", nullptr, PluginFieldType::kINT32, 1));
-        attr_.emplace_back(PluginField("num_heads", nullptr, PluginFieldType::kINT32, 1));
         fc_.nbFields = attr_.size();
         fc_.fields   = attr_.data();
     }
 
-    ~STReshapePluginCreator() {}
+    ~STReshapeAddPluginCreator() {}
 
     IPluginV2* createPlugin(const char* name, const PluginFieldCollection* fc) noexcept override
     {
         WHERE_AM_I();
+        int shift {-4};
         int window_size {8};
         int type {0};
-        int num_heads {6};
         for (int i = 0; i < fc->nbFields; i++)
         {
             std::string field_name(fc->fields[i].name);
+            if (field_name.compare("shift") == 0)
+            {
+                shift = *static_cast<const int *>(fc->fields[i].data);
+            }
             if (field_name.compare("window_size") == 0)
             {
                 window_size = *static_cast<const int *>(fc->fields[i].data);
@@ -277,17 +222,13 @@ public:
             {
                 type = *static_cast<const int *>(fc->fields[i].data);
             }
-            if (field_name.compare("num_heads") == 0)
-            {
-                num_heads = *static_cast<const int *>(fc->fields[i].data);
-            }
         }
-        return new STReshapePlugin(name, window_size, type, num_heads);
+        return new STReshapeAddPlugin(name, shift, window_size, type);
     }
 
     IPluginV2* deserializePlugin(const char* name, const void* serialData, size_t serialLength) noexcept override
     {
-        return new STReshapePlugin(name, serialData, serialLength);
+        return new STReshapeAddPlugin(name, serialData, serialLength);
     }
 
     void setPluginNamespace(const char* szNamespace) noexcept override
@@ -314,7 +255,7 @@ public:
     {
         return &fc_;
     }
-}; // class STReshapePluginCreator
+}; // class STReshapeAddPluginCreator
 
 } // namespace nvinfer1
 

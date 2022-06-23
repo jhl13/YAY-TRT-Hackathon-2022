@@ -12,12 +12,14 @@ def surgeon(onnx_path):
     ScatterNDNode = None
     ConvNode = None
     FirstLayerNormNode = None
+    FirstSTReshapeNode = None
 
     nFill = 0
     nWindowsMask = 0
     nLayerNorm = 0
     nSTReshape = 0
     nSTReshapeRoll = 0
+    nSTReshapeAdd = 0
     for node_id, node in enumerate(graph.nodes):
         if node.name == "ConstantOfShape_117": # ConstantOfShape_62 ConstantOfShape_117
             ConstantOfShapeNode = node
@@ -65,14 +67,14 @@ def surgeon(onnx_path):
 
     graph.cleanup().toposort()
 
-    # if ConstantOfShapeNode is not None and ShapeNode is not None and ScatterNDNode is not None:
-    #     img_mask = ConstantOfShapeNode.outputs[0]
-    #     img_mask_shape = ShapeNode.outputs[0]
-    #     WindowsMaskN = gs.Node("WindowsMask", "WindowsMask-" + str(nWindowsMask), inputs=[img_mask, img_mask_shape], outputs=[ScatterNDNode.outputs[0]])
-    #     graph.nodes.append(WindowsMaskN)
-    #     nWindowsMask += 1
-    #     ScatterNDNode.outputs = []
-    # graph.cleanup().toposort()
+    if ConstantOfShapeNode is not None and ShapeNode is not None and ScatterNDNode is not None:
+        img_mask = ConstantOfShapeNode.outputs[0]
+        img_mask_shape = ShapeNode.outputs[0]
+        WindowsMaskN = gs.Node("WindowsMask", "WindowsMask-" + str(nWindowsMask), inputs=[img_mask, img_mask_shape], outputs=[ScatterNDNode.outputs[0]])
+        graph.nodes.append(WindowsMaskN)
+        nWindowsMask += 1
+        ScatterNDNode.outputs = []
+    graph.cleanup().toposort()
 
     for node_id, node in enumerate(graph.nodes):
         # without shift
@@ -136,7 +138,7 @@ def surgeon(onnx_path):
         # 可不用
         if node.op == "Transpose" and node.o().op == "Reshape" and \
             len(node.o().outputs) > 0 and node.o().outputs[0].name != "outputs" and \
-            node.o().o().op == "Reshape":
+            node.o().o().op == "Reshape" and node.o().o().o().op != "Unsqueeze":
             FirstN = node.o()
             LastN = node.o().o()
             STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
@@ -170,11 +172,51 @@ def surgeon(onnx_path):
             nSTReshape += 1
             node.outputs = []
 
+    for node_id, node in enumerate(graph.nodes):
+        if node.name == "STReshape-2":
+            FirstSTReshapeNode = node
+        if node.op == "STReshape" and node.o().op == "Shape" and node.o(3).op == "MatMul" and node.o(3).o().op == "Add" and \
+            node.o(3).o().o().op == "Reshape":
+            reshapeNode = node.o(3).o().o()
+            STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
+                                    inputs=[reshapeNode.inputs[0], FirstSTReshapeNode.outputs[0]], 
+                                    outputs=[reshapeNode.outputs[0]],
+                                    attrs={"type":5, "num_heads":6})
+            graph.nodes.append(STReshapeN)
+            nSTReshape += 1
+            reshapeNode.outputs = []
+
+        if node.op == "Softmax" and node.o().op == "MatMul" and node.o().o().op == "Transpose" and node.o().o().o().op == "Reshape":
+            reshapeNode = node.o().o().o()
+            STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
+                                    inputs=[reshapeNode.inputs[0], FirstSTReshapeNode.outputs[0]], 
+                                    outputs=[reshapeNode.outputs[0]],
+                                    attrs={"type":6, "num_heads":6})
+            graph.nodes.append(STReshapeN)
+            nSTReshape += 1
+            reshapeNode.outputs = []
+
+        if node.op == "Mul" and node.o().op == "MatMul" and node.o().o().op == "Add" and \
+            node.o().o().o().op == "Reshape" and node.o().o().o().o().op == "Add" and \
+             node.o().o().o().o().o().op == "Reshape":
+            FirstNode = node.o().o().o()
+            LastNode = node.o().o().o().o().o()
+            maskNode = node.o().o().o().o()
+            STReshapeAddN = gs.Node("STReshapeAdd", "STReshapeAdd-" + str(nSTReshapeAdd), 
+                                    inputs=[FirstNode.inputs[0], maskNode.inputs[1]], 
+                                    outputs=[LastNode.outputs[0]],
+                                    attrs={"type":6, "num_heads":6})
+            graph.nodes.append(STReshapeAddN)
+            nSTReshapeAdd += 1
+            LastNode.outputs = []
+
+
     print(f"nFill: {nFill}")
     print(f"nWindowsMask: {nWindowsMask}")
     print(f"nLayerNorm: {nLayerNorm}")
     print(f"nSTReshape: {nSTReshape}")
     print(f"nSTReshapeRoll: {nSTReshapeRoll}")
+    print(f"nSTReshapeAdd: {nSTReshapeAdd}")
 
     graph.cleanup().toposort()
     surgeon_onnx_path = onnx_path.replace(".onnx", "_surgeon.onnx")

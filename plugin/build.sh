@@ -22,3 +22,8 @@ cd STReshapeRoll
 make
 mv *.so ../
 cd ..
+
+cd STReshapeAdd
+make
+mv *.so ../
+cd ..
