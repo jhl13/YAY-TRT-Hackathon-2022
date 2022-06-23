@@ -27,3 +27,8 @@ cd STReshapeAdd
 make
 mv *.so ../
 cd ..
+
+cd MyGatherPlugin
+make
+mv *.so ../
+cd ..

@@ -20,6 +20,7 @@ def surgeon(onnx_path):
     nSTReshape = 0
     nSTReshapeRoll = 0
     nSTReshapeAdd = 0
+    nMyGather = 0
     for node_id, node in enumerate(graph.nodes):
         if node.name == "ConstantOfShape_117": # ConstantOfShape_62 ConstantOfShape_117
             ConstantOfShapeNode = node
@@ -85,7 +86,7 @@ def surgeon(onnx_path):
             STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
                                     inputs=[reshapeN.inputs[0], ConvNode.outputs[0]], 
                                     outputs=[LastN.outputs[0]],
-                                    attrs={"type":0, "window_size":8})
+                                    attrs={"type":0, "window_size":8, "num_heads":6})
             graph.nodes.append(STReshapeN)
             nSTReshape += 1
             LastN.outputs = []
@@ -98,7 +99,7 @@ def surgeon(onnx_path):
             STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
                                     inputs=[reshapeN.inputs[0], FirstLayerNormNode.outputs[0]], 
                                     outputs=[LastN.outputs[0]],
-                                    attrs={"type":1, "window_size":8})
+                                    attrs={"type":1, "window_size":8, "num_heads":6})
             graph.nodes.append(STReshapeN)
             nSTReshape += 1
             LastN.outputs = []
@@ -144,7 +145,7 @@ def surgeon(onnx_path):
             STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
                                     inputs=[FirstN.inputs[0], FirstLayerNormNode.outputs[0]], 
                                     outputs=[LastN.outputs[0]],
-                                    attrs={"type":2, "window_size":8})
+                                    attrs={"type":2, "window_size":8, "num_heads":6})
             graph.nodes.append(STReshapeN)
             nSTReshape += 1
             LastN.outputs = []
@@ -156,7 +157,7 @@ def surgeon(onnx_path):
             STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
                                     inputs=[FirstN.inputs[0], ConvNode.outputs[0]], 
                                     outputs=[LastN.outputs[0]],
-                                    attrs={"type":3, "window_size":8})
+                                    attrs={"type":3, "window_size":8, "num_heads":6})
             graph.nodes.append(STReshapeN)
             nSTReshape += 1
             LastN.outputs = []
@@ -167,7 +168,7 @@ def surgeon(onnx_path):
             STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
                                     inputs=[node.inputs[0], ConvNode.outputs[0]], 
                                     outputs=[node.outputs[0]],
-                                    attrs={"type":4, "window_size":8})
+                                    attrs={"type":4, "window_size":8, "num_heads":6})
             graph.nodes.append(STReshapeN)
             nSTReshape += 1
             node.outputs = []
@@ -181,7 +182,7 @@ def surgeon(onnx_path):
             STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
                                     inputs=[reshapeNode.inputs[0], FirstSTReshapeNode.outputs[0]], 
                                     outputs=[reshapeNode.outputs[0]],
-                                    attrs={"type":5, "num_heads":6})
+                                    attrs={"type":5, "num_heads":6, "window_size":8})
             graph.nodes.append(STReshapeN)
             nSTReshape += 1
             reshapeNode.outputs = []
@@ -191,7 +192,7 @@ def surgeon(onnx_path):
             STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
                                     inputs=[reshapeNode.inputs[0], FirstSTReshapeNode.outputs[0]], 
                                     outputs=[reshapeNode.outputs[0]],
-                                    attrs={"type":6, "num_heads":6})
+                                    attrs={"type":6, "num_heads":6, "window_size":8})
             graph.nodes.append(STReshapeN)
             nSTReshape += 1
             reshapeNode.outputs = []
@@ -209,6 +210,41 @@ def surgeon(onnx_path):
             graph.nodes.append(STReshapeAddN)
             nSTReshapeAdd += 1
             LastNode.outputs = []
+    graph.cleanup().toposort()
+
+    for node_id, node in enumerate(graph.nodes):
+        if node.op == "Gather" and node.o().op == "Mul" and node.o().o().op == "MatMul":
+            FirstNode = node
+            LastNode = node
+            MyGatherN = gs.Node("MyGather", "MyGather-" + str(nMyGather), 
+                                    inputs=[FirstNode.inputs[0]], 
+                                    outputs=[LastNode.outputs[0]],
+                                    attrs={"dim":0})
+            graph.nodes.append(MyGatherN)
+            nMyGather += 1
+            LastNode.outputs = []
+
+        if node.op == "Gather" and len(node.outputs) > 0 and node.o().op == "Transpose" and node.o().o().op == "MatMul":
+            FirstNode = node
+            LastNode = node
+            MyGatherN = gs.Node("MyGather", "MyGather-" + str(nMyGather), 
+                                    inputs=[FirstNode.inputs[0]], 
+                                    outputs=[LastNode.outputs[0]],
+                                    attrs={"dim":1})
+            graph.nodes.append(MyGatherN)
+            nMyGather += 1
+            LastNode.outputs = []
+
+        if node.op == "Gather" and len(node.outputs) > 0 and node.o().op == "MatMul" and node.o().o().op == "Transpose":
+            FirstNode = node
+            LastNode = node
+            MyGatherN = gs.Node("MyGather", "MyGather-" + str(nMyGather), 
+                                    inputs=[FirstNode.inputs[0]], 
+                                    outputs=[LastNode.outputs[0]],
+                                    attrs={"dim":2})
+            graph.nodes.append(MyGatherN)
+            nMyGather += 1
+            LastNode.outputs = []
 
 
     print(f"nFill: {nFill}")
@@ -217,6 +253,7 @@ def surgeon(onnx_path):
     print(f"nSTReshape: {nSTReshape}")
     print(f"nSTReshapeRoll: {nSTReshapeRoll}")
     print(f"nSTReshapeAdd: {nSTReshapeAdd}")
+    print(f"nMyGather: {nMyGather}")
 
     graph.cleanup().toposort()
     surgeon_onnx_path = onnx_path.replace(".onnx", "_surgeon.onnx")
