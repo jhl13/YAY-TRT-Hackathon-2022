@@ -1,4 +1,5 @@
 import argparse
+from cv2 import exp
 import onnx
 import onnx_graphsurgeon as gs
 import numpy as np
@@ -22,13 +23,13 @@ def surgeon(onnx_path):
     nSTReshapeAdd = 0
     nMyGather = 0
     for node_id, node in enumerate(graph.nodes):
-        if node.name == "ConstantOfShape_117": # ConstantOfShape_62 ConstantOfShape_117
+        if node.name == "ConstantOfShape_121": # ConstantOfShape_121
             ConstantOfShapeNode = node
-        if node.name == "Shape_139": # Shape_84 Shape_139
+        if node.name == "Shape_143": # Shape_143
             ShapeNode = node
-        if node.name == "ScatterND_1080": # ScatterND_1025 ScatterND_1080
+        if node.name == "ScatterND_1084": # ScatterND_1084
             ScatterNDNode = node
-        if node.name == "Conv_56": # Conv_50
+        if node.name == "Conv_56":
             ConvNode = node
 
         if node.op == 'ReduceMean' and \
@@ -172,10 +173,15 @@ def surgeon(onnx_path):
             graph.nodes.append(STReshapeN)
             nSTReshape += 1
             node.outputs = []
+    graph.cleanup().toposort()
 
     for node_id, node in enumerate(graph.nodes):
-        if node.name == "STReshape-2":
-            FirstSTReshapeNode = node
+        if node.op == "LayerNorm" and node.o().op == "STReshape" and \
+            node.o().o().op == "Transpose" and node.o().o().o().op == "STReshape":
+                FirstSTReshapeNode = node.o().o().o()
+                break
+
+    for node_id, node in enumerate(graph.nodes):
         if node.op == "STReshape" and node.o().op == "Shape" and node.o(3).op == "MatMul" and node.o(3).o().op == "Add" and \
             node.o(3).o().o().op == "Reshape":
             reshapeNode = node.o(3).o().o()
@@ -206,45 +212,32 @@ def surgeon(onnx_path):
             STReshapeAddN = gs.Node("STReshapeAdd", "STReshapeAdd-" + str(nSTReshapeAdd), 
                                     inputs=[FirstNode.inputs[0], maskNode.inputs[1]], 
                                     outputs=[LastNode.outputs[0]],
-                                    attrs={"type":6, "num_heads":6})
+                                    attrs={"type":6, "num_heads":6, "window_size": 8})
             graph.nodes.append(STReshapeAddN)
             nSTReshapeAdd += 1
             LastNode.outputs = []
     graph.cleanup().toposort()
 
     for node_id, node in enumerate(graph.nodes):
-        if node.op == "Gather" and node.o().op == "Mul" and node.o().o().op == "MatMul":
-            FirstNode = node
-            LastNode = node
-            MyGatherN = gs.Node("MyGather", "MyGather-" + str(nMyGather), 
-                                    inputs=[FirstNode.inputs[0]], 
-                                    outputs=[LastNode.outputs[0]],
-                                    attrs={"dim":0})
-            graph.nodes.append(MyGatherN)
-            nMyGather += 1
-            LastNode.outputs = []
-
-        if node.op == "Gather" and len(node.outputs) > 0 and node.o().op == "Transpose" and node.o().o().op == "MatMul":
-            FirstNode = node
-            LastNode = node
-            MyGatherN = gs.Node("MyGather", "MyGather-" + str(nMyGather), 
-                                    inputs=[FirstNode.inputs[0]], 
-                                    outputs=[LastNode.outputs[0]],
-                                    attrs={"dim":1})
-            graph.nodes.append(MyGatherN)
-            nMyGather += 1
-            LastNode.outputs = []
-
-        if node.op == "Gather" and len(node.outputs) > 0 and node.o().op == "MatMul" and node.o().o().op == "Transpose":
-            FirstNode = node
-            LastNode = node
-            MyGatherN = gs.Node("MyGather", "MyGather-" + str(nMyGather), 
-                                    inputs=[FirstNode.inputs[0]], 
-                                    outputs=[LastNode.outputs[0]],
-                                    attrs={"dim":2})
-            graph.nodes.append(MyGatherN)
-            nMyGather += 1
-            LastNode.outputs = []
+        try:
+            if node.op == "Transpose" and node.o().op == "Gather" and node.o().o().op == "Mul" and node.o().o().o().op == "MatMul" and \
+                node.o(1).op == "Gather" and node.o(1).o().op == "Transpose" and node.o(1).o().o().op == "MatMul" and \
+                node.o(2).op == "Gather" and node.o(2).o().op == "MatMul" and node.o(2).o().o().op == "Transpose":
+                FirstNode = node
+                Gather1Node = node.o()
+                Gather2Node = node.o(1)
+                Gather3Node = node.o(2)
+                MyGatherN = gs.Node("MyGather", "MyGather-" + str(nMyGather), 
+                                        inputs=[FirstNode.outputs[0]], 
+                                        outputs=[Gather1Node.outputs[0], Gather2Node.outputs[0], Gather3Node.outputs[0]],
+                                        attrs={"dim":0})
+                graph.nodes.append(MyGatherN)
+                nMyGather += 1
+                Gather1Node.outputs = []
+                Gather2Node.outputs = []
+                Gather3Node.outputs = []
+        except:
+            pass
 
 
     print(f"nFill: {nFill}")

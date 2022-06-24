@@ -86,7 +86,7 @@ public:
     int getNbOutputs() const noexcept override
     {
         WHERE_AM_I();
-        return 1;
+        return 3;
     }
 
     DimsExprs getOutputDimensions(int32_t outputIndex, const DimsExprs* inputs, int32_t nbInputs, IExprBuilder& exprBuilder) noexcept override
@@ -115,6 +115,10 @@ public:
         case 0:
             res = (inOut[pos].type == DataType::kFLOAT); break;
         case 1:
+            res = (inOut[pos].type == DataType::kFLOAT); break;
+        case 2:
+            res = (inOut[pos].type == DataType::kFLOAT); break;
+        case 3:
             res = (inOut[pos].type == DataType::kFLOAT); break;
         default:// should NOT be here
             res = false;

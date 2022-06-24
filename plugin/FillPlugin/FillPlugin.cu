@@ -25,8 +25,11 @@ __global__ void fillKernel(float *pInput, float *pOutput)
 {
     const int tx = threadIdx.x, index = blockIdx.x * 256 + threadIdx.x;
 
-    if (pInput[index] != 0){
+    if (pInput[index] > 0.1 || pInput[index] < -0.1){
         pOutput[index] = -100.0;
+    }
+    else{
+        pOutput[index] = 0.0;
     }
 }
 

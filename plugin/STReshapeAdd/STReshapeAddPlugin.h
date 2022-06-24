@@ -46,15 +46,15 @@ private:
     std::string name_;
     std::string namespace_;
     struct{
-        int shift_;
+        int num_heads_;
         int window_size_;
         int type_;
     }m;
 
 public:
-    STReshapeAddPlugin(const std::string& name, int shift, int window_size, int type) : name_(name)
+    STReshapeAddPlugin(const std::string& name, int num_heads, int window_size, int type) : name_(name)
     {
-        m.shift_ = shift;
+        m.num_heads_ = num_heads;
         m.window_size_ = window_size;
         m.type_ = type;
         WHERE_AM_I();
@@ -88,7 +88,7 @@ public:
     IPluginV2DynamicExt* clone() const noexcept override
     {
         WHERE_AM_I();
-        return new STReshapeAddPlugin(name_, m.shift_, m.window_size_, m.type_);
+        return new STReshapeAddPlugin(name_, m.num_heads_, m.window_size_, m.type_);
     }
 
     int getNbOutputs() const noexcept override
@@ -192,7 +192,7 @@ private:
 public:
     STReshapeAddPluginCreator()
     {
-        attr_.emplace_back(PluginField("shift", nullptr, PluginFieldType::kINT32, 1));
+        attr_.emplace_back(PluginField("num_heads", nullptr, PluginFieldType::kINT32, 1));
         attr_.emplace_back(PluginField("window_size", nullptr, PluginFieldType::kINT32, 1));
         attr_.emplace_back(PluginField("type", nullptr, PluginFieldType::kINT32, 1));
         fc_.nbFields = attr_.size();
@@ -204,15 +204,15 @@ public:
     IPluginV2* createPlugin(const char* name, const PluginFieldCollection* fc) noexcept override
     {
         WHERE_AM_I();
-        int shift {-4};
+        int num_heads {6};
         int window_size {8};
         int type {0};
         for (int i = 0; i < fc->nbFields; i++)
         {
             std::string field_name(fc->fields[i].name);
-            if (field_name.compare("shift") == 0)
+            if (field_name.compare("num_heads") == 0)
             {
-                shift = *static_cast<const int *>(fc->fields[i].data);
+                num_heads = *static_cast<const int *>(fc->fields[i].data);
             }
             if (field_name.compare("window_size") == 0)
             {
@@ -223,7 +223,7 @@ public:
                 type = *static_cast<const int *>(fc->fields[i].data);
             }
         }
-        return new STReshapeAddPlugin(name, shift, window_size, type);
+        return new STReshapeAddPlugin(name, num_heads, window_size, type);
     }
 
     IPluginV2* deserializePlugin(const char* name, const void* serialData, size_t serialLength) noexcept override

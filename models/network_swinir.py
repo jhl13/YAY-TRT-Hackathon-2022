@@ -131,6 +131,7 @@ class WindowAttention(nn.Module):
 
         if mask is not None:
             nW = mask.shape[0]
+            # attn shape:[1, B_, 6, N, N], mask shape:[1, B_, 1, N, N]
             attn = attn.view(B_ // mask.shape[0], mask.shape[0], self.num_heads, N, N) + mask.unsqueeze(1).unsqueeze(0)
             attn = attn.view(-1, self.num_heads, N, N)
             attn = self.softmax(attn)
@@ -393,7 +394,7 @@ class BasicLayer(nn.Module):
             self.downsample = None
 
     def forward(self, x, x_size, mask, mask_shift):
-        for i in range(1): # x_windows
+        for i in range(self.depth): # x_windows
             blk = self.blocks[i]
             if self.use_checkpoint:
                 x = checkpoint.checkpoint(blk, x, x_size)
@@ -825,7 +826,7 @@ class SwinIR(nn.Module):
             x = x + self.absolute_pos_embed
         x = self.pos_drop(x)
 
-        for layer in self.layers[:1]:
+        for layer in self.layers:
             x = layer(x, x_size, mask, mask_shift)
 
         x = self.norm(x)  # B L C

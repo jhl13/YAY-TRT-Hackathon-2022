@@ -5,18 +5,14 @@ using namespace nvinfer1;
 PluginFieldCollection    STReshapeAddPluginCreator::fc_ {};
 std::vector<PluginField> STReshapeAddPluginCreator::attr_;
 
-__global__ void STReshapeAddKernel(float *pInput, int fea_b, int fea_h, int fea_w, int fea_c, int shift, float *pOutput)
+__global__ void STReshapeAddKernel(float *pInput, float *pAdd, int num_heads, int windows_pow, float *pOutput)
 {
     const int index = blockIdx.x * 256 + threadIdx.x;
-    int w = index / fea_c % fea_w;
-    int h = index / (fea_w * fea_c) % fea_h;
-    int b = index / (fea_h * fea_w * fea_c);
+    int B_ = index / (num_heads * windows_pow);
+    int window_pos = index % windows_pow;
+    int addIndex = B_ * windows_pow + window_pos;
 
-    int target_w = (fea_w + shift + w) % fea_w;
-    int target_h = (fea_h + shift + h) % fea_h;
-
-    int target_pos = b * (fea_h * fea_w * fea_c) + target_h * (fea_w * fea_c)+ target_w * fea_c + index % fea_c;
-    pOutput[target_pos] = pInput[index];
+    pOutput[index] = pInput[index] + pAdd[addIndex];
 }
 
 int32_t STReshapeAddPlugin::enqueue(const PluginTensorDesc *inputDesc, const PluginTensorDesc *outputDesc, const void *const *inputs, void *const *outputs, void *workspace, cudaStream_t stream) noexcept
@@ -28,22 +24,12 @@ int32_t STReshapeAddPlugin::enqueue(const PluginTensorDesc *inputDesc, const Plu
         nElement *= inputDesc[0].dims.d[i];
     }
 
-    // dim3 grid(CEIL_DIVIDE(nElement, 256), 1, 1), block(256, 1, 1); 
-    // if (m.type_ == 0){
-    //     int fea_b = inputDesc[1].dims.d[0], fea_h = inputDesc[1].dims.d[2], fea_w = inputDesc[1].dims.d[3], fea_c = inputDesc[1].dims.d[1];
-    //     // int fea_b = 1, fea_h = 256, fea_w = 256, fea_c = 60;
-    //     // printf("0-- fea_b:%d, fea_h:%d, fea_w:%d, fea_c:%d \n", fea_b, fea_h, fea_w, fea_c);
-    //     STReshapeAddKernel<<<grid, block, 0, stream>>>((float *)inputs[0], fea_b, fea_h, fea_w, fea_c, m.shift_, (float *)outputs[0]);
-    // }
-    // else if (m.type_ == 1){
-    //     int fea_b = inputDesc[0].dims.d[0], fea_h = inputDesc[0].dims.d[1] * m.window_size_, fea_w = inputDesc[0].dims.d[3] * m.window_size_, fea_c = inputDesc[1].dims.d[2];
-    //     // int fea_b = 1, fea_h = 256, fea_w = 256, fea_c = 60;
-    //     // printf("1-- fea_b:%d, fea_h:%d, fea_w:%d, fea_c:%d \n", fea_b, fea_h, fea_w, fea_c);
-    //     STReshapeAddKernel<<<grid, block, 0, stream>>>((float *)inputs[0], fea_b, fea_h, fea_w, fea_c, m.shift_, (float *)outputs[0]);
-    // }
-    // else{
-    //     printf("No implement!");
-    // }
+    dim3 grid(CEIL_DIVIDE(nElement, 256), 1, 1), block(256, 1, 1);
+    int windows_pow = m.window_size_ * m.window_size_ * m.window_size_ * m.window_size_;
+    // printf("input0 dim1: %d, dim2: %d, dim3: %d, dim4: %d\n", inputDesc[0].dims.d[0], inputDesc[0].dims.d[1], inputDesc[0].dims.d[2], inputDesc[0].dims.d[3], inputDesc[0].dims.d[4]);
+    // printf("input1 dim1: %d, dim2: %d, dim3: %d, dim4: %d\n", inputDesc[1].dims.d[0], inputDesc[1].dims.d[1], inputDesc[1].dims.d[2], inputDesc[1].dims.d[3], inputDesc[1].dims.d[4]);
+    // printf("windows_pow: %d, num_heads: %d \n", windows_pow, m.num_heads_);
+    STReshapeAddKernel<<<grid, block, 0, stream>>>((float *)inputs[0], (float *)inputs[1], m.num_heads_, windows_pow, (float *)outputs[0]);
     return 0;
 }
 

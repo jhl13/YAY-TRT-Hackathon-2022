@@ -23,7 +23,7 @@ std::vector<PluginField> WindowsMaskPluginCreator::attr_;
 
 __global__ void windowsMaskKernel(float *pInput, int *shape, float *pOutput, int nElement)
 {
-    const int index = blockIdx.x * 64 + threadIdx.x;
+    const int index = blockIdx.x * 256 + threadIdx.x;
     if (index > nElement){
         return;
     }
@@ -70,7 +70,7 @@ int32_t WindowsMaskPlugin::enqueue(const PluginTensorDesc* inputDesc, const Plug
         nElement *= inputDesc[0].dims.d[i];
     }
 
-    dim3 grid(CEIL_DIVIDE(nElement, 64), 1, 1), block(64, 1, 1); 
+    dim3 grid(CEIL_DIVIDE(nElement, 256), 1, 1), block(256, 1, 1); 
     windowsMaskKernel <<<grid, block, 0, stream>>>((float *)inputs[0], (int *)inputs[1], (float *)outputs[0], nElement);
     return 0;
 }

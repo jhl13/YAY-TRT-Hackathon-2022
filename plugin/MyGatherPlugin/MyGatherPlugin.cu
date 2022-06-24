@@ -5,18 +5,20 @@ using namespace nvinfer1;
 PluginFieldCollection    MyGatherPluginCreator::fc_ {};
 std::vector<PluginField> MyGatherPluginCreator::attr_;
 
-__global__ void MyGatherKernel(float *pInput, int fea_b, int fea_h, int fea_w, int fea_c, int shift, float *pOutput)
+__global__ void MyGatherKernel(float *pInput, int nfea, float *pOutput0, float *pOutput1, float *pOutput2)
 {
     const int index = blockIdx.x * 256 + threadIdx.x;
-    int w = index / fea_c % fea_w;
-    int h = index / (fea_w * fea_c) % fea_h;
-    int b = index / (fea_h * fea_w * fea_c);
-
-    int target_w = (fea_w + shift + w) % fea_w;
-    int target_h = (fea_h + shift + h) % fea_h;
-
-    int target_pos = b * (fea_h * fea_w * fea_c) + target_h * (fea_w * fea_c)+ target_w * fea_c + index % fea_c;
-    pOutput[target_pos] = pInput[index];
+    int target_pos = index % nfea;
+    int target_dim = index / nfea;
+    if (target_dim == 0){
+        pOutput0[target_pos] = pInput[index];
+    }
+    else if (target_dim == 1){
+        pOutput1[target_pos] = pInput[index];
+    }
+    else{
+        pOutput2[target_pos] = pInput[index];
+    }
 }
 
 int32_t MyGatherPlugin::enqueue(const PluginTensorDesc *inputDesc, const PluginTensorDesc *outputDesc, const void *const *inputs, void *const *outputs, void *workspace, cudaStream_t stream) noexcept
@@ -27,23 +29,14 @@ int32_t MyGatherPlugin::enqueue(const PluginTensorDesc *inputDesc, const PluginT
     {
         nElement *= inputDesc[0].dims.d[i];
     }
+    int nfea = 1;
+    for (int i = 1; i < inputDesc[0].dims.nbDims; i++)
+    {
+        nfea *= inputDesc[0].dims.d[i];
+    }
 
-    // dim3 grid(CEIL_DIVIDE(nElement, 256), 1, 1), block(256, 1, 1); 
-    // if (m.type_ == 0){
-    //     int fea_b = inputDesc[1].dims.d[0], fea_h = inputDesc[1].dims.d[2], fea_w = inputDesc[1].dims.d[3], fea_c = inputDesc[1].dims.d[1];
-    //     // int fea_b = 1, fea_h = 256, fea_w = 256, fea_c = 60;
-    //     // printf("0-- fea_b:%d, fea_h:%d, fea_w:%d, fea_c:%d \n", fea_b, fea_h, fea_w, fea_c);
-    //     MyGatherKernel<<<grid, block, 0, stream>>>((float *)inputs[0], fea_b, fea_h, fea_w, fea_c, m.shift_, (float *)outputs[0]);
-    // }
-    // else if (m.type_ == 1){
-    //     int fea_b = inputDesc[0].dims.d[0], fea_h = inputDesc[0].dims.d[1] * m.window_size_, fea_w = inputDesc[0].dims.d[3] * m.window_size_, fea_c = inputDesc[1].dims.d[2];
-    //     // int fea_b = 1, fea_h = 256, fea_w = 256, fea_c = 60;
-    //     // printf("1-- fea_b:%d, fea_h:%d, fea_w:%d, fea_c:%d \n", fea_b, fea_h, fea_w, fea_c);
-    //     MyGatherKernel<<<grid, block, 0, stream>>>((float *)inputs[0], fea_b, fea_h, fea_w, fea_c, m.shift_, (float *)outputs[0]);
-    // }
-    // else{
-    //     printf("No implement!");
-    // }
+    dim3 grid(CEIL_DIVIDE(nElement, 256), 1, 1), block(256, 1, 1);
+    MyGatherKernel<<<grid, block, 0, stream>>>((float *)inputs[0], nfea, (float *)outputs[0], (float *)outputs[1], (float *)outputs[2]);
     return 0;
 }
 
