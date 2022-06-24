@@ -92,18 +92,18 @@ def surgeon(onnx_path):
             nSTReshape += 1
             LastN.outputs = []
 
-        # without shift 可不用
-        if node.op == "Reshape" and len(node.outputs) > 0  and node.outputs[0].name != "outputs" and node.o().op == "Reshape" and \
-                node.o().o().op == "Add" and node.o().o().o(1).op == "LayerNorm":
-            reshapeN = node
-            LastN = node.o()
-            STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
-                                    inputs=[reshapeN.inputs[0], FirstLayerNormNode.outputs[0]], 
-                                    outputs=[LastN.outputs[0]],
-                                    attrs={"type":1, "window_size":8, "num_heads":6})
-            graph.nodes.append(STReshapeN)
-            nSTReshape += 1
-            LastN.outputs = []
+        # # without shift 可不用
+        # if node.op == "Reshape" and len(node.outputs) > 0  and node.outputs[0].name != "outputs" and node.o().op == "Reshape" and \
+        #         node.o().o().op == "Add" and node.o().o().o(1).op == "LayerNorm":
+        #     reshapeN = node
+        #     LastN = node.o()
+        #     STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
+        #                             inputs=[reshapeN.inputs[0], FirstLayerNormNode.outputs[0]], 
+        #                             outputs=[LastN.outputs[0]],
+        #                             attrs={"type":1, "window_size":8, "num_heads":6})
+        #     graph.nodes.append(STReshapeN)
+        #     nSTReshape += 1
+        #     LastN.outputs = []
 
         # shift
         if node.op == "LayerNorm" and node.outputs[0].name != "outputs" and node.o().op == "Reshape"  and \
@@ -137,19 +137,19 @@ def surgeon(onnx_path):
     graph.cleanup().toposort()
 
     for node_id, node in enumerate(graph.nodes):
-        # 可不用
-        if node.op == "Transpose" and node.o().op == "Reshape" and \
-            len(node.o().outputs) > 0 and node.o().outputs[0].name != "outputs" and \
-            node.o().o().op == "Reshape" and node.o().o().o().op != "Unsqueeze":
-            FirstN = node.o()
-            LastN = node.o().o()
-            STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
-                                    inputs=[FirstN.inputs[0], FirstLayerNormNode.outputs[0]], 
-                                    outputs=[LastN.outputs[0]],
-                                    attrs={"type":2, "window_size":8, "num_heads":6})
-            graph.nodes.append(STReshapeN)
-            nSTReshape += 1
-            LastN.outputs = []
+        # # 可不用
+        # if node.op == "Transpose" and node.o().op == "Reshape" and \
+        #     len(node.o().outputs) > 0 and node.o().outputs[0].name != "outputs" and \
+        #     node.o().o().op == "Reshape" and node.o().o().o().op != "Unsqueeze":
+        #     FirstN = node.o()
+        #     LastN = node.o().o()
+        #     STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
+        #                             inputs=[FirstN.inputs[0], FirstLayerNormNode.outputs[0]], 
+        #                             outputs=[LastN.outputs[0]],
+        #                             attrs={"type":2, "window_size":8, "num_heads":6})
+        #     graph.nodes.append(STReshapeN)
+        #     nSTReshape += 1
+        #     LastN.outputs = []
 
         if node.op == "Reshape" and len(node.outputs) > 0 and node.outputs[0].name != "outputs" and \
                 node.o().op == "Reshape" and len(node.o().outputs) > 0 and node.o().o().op == "Transpose":
@@ -178,8 +178,13 @@ def surgeon(onnx_path):
     for node_id, node in enumerate(graph.nodes):
         if node.op == "LayerNorm" and node.o().op == "STReshape" and \
             node.o().o().op == "Transpose" and node.o().o().o().op == "STReshape":
-                FirstSTReshapeNode = node.o().o().o()
-                break
+            FirstSTReshapeNode = node.o().o().o()
+            break
+        if node.op == "Transpose" and node.o().op == "Reshape" and \
+            len(node.o().outputs) > 0 and node.o().outputs[0].name != "outputs" and \
+            node.o().o().op == "Reshape" and node.o().o().o().op != "Unsqueeze":
+            FirstSTReshapeNode = node.o().o()
+            break
 
     for node_id, node in enumerate(graph.nodes):
         if node.op == "STReshape" and node.o().op == "Shape" and node.o(3).op == "MatMul" and node.o(3).o().op == "Add" and \

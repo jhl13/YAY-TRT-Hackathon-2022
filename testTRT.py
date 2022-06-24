@@ -274,7 +274,6 @@ def check(a, b, weak=False, epsilon = 1e-5):
         res = np.all( a == b )
     diff0 = np.max(np.abs(a - b))
     diff1 = np.median(np.abs(a - b) / (np.abs(b) + epsilon))
-    #print("check:",res,diff0,diff1)
     return res, diff0, diff1
 
 def testTRT():
@@ -390,43 +389,41 @@ def testTRT():
 
         index_output = engine.get_binding_index("outputs")
         output = bufferH[index_output]
+        output = output[..., :h_old * scale, :w_old * scale]
+
+        # save image
+        output = np.clip(np.squeeze(output), 0.0, 1.0)
+        if output.ndim == 3:
+            output = np.transpose(output[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
+        output = (output * 255.0).round().astype(np.uint8)  # float32 to uint8
+
+        # evaluate psnr/ssim/psnr_b
+        if img_gt is not None:
+            img_gt = (img_gt * 255.0).round().astype(np.uint8)  # float32 to uint8
+            img_gt = img_gt[:h_old * scale, :w_old * scale, ...]  # crop gt
+            img_gt = np.squeeze(img_gt)
+
+            psnr = calculate_psnr(output, img_gt, crop_border=border)
+            ssim = calculate_ssim(output, img_gt, crop_border=border)
+            test_results['psnr'].append(psnr)
+            test_results['ssim'].append(ssim)
+            if img_gt.ndim == 3:  # RGB image
+                psnr_y = calculate_psnr(output, img_gt, crop_border=border, test_y_channel=True)
+                ssim_y = calculate_ssim(output, img_gt, crop_border=border, test_y_channel=True)
+                test_results['psnr_y'].append(psnr_y)
+                test_results['ssim_y'].append(ssim_y)
+        else:
+            print('Testing {:d} {:20s}'.format(idx, imgname))
 
         gt_data = np.load(path.replace(".png", ".npz"))
         gt_output = gt_data["output"]
-        check_res = check(output, gt_output, True)
-        print(output.shape)
+        check_res = check(np.asarray(output, dtype=np.float), np.asarray(gt_output, dtype=np.float), True)
         string = "%4d,%4d,%8.3f,%9.3e,%9.3e"%(h_old, w_old, timePerInference, check_res[1], check_res[2])
-        print(string + ", %s"%("Good" if check_res[1] < 1e-4 and check_res[2] < 1e-4 else "Bad"))
-
-        # output = output[..., :h_old * scale, :w_old * scale]
-
-        # # save image
-        # output = np.clip(np.squeeze(output), 0.0, 1.0)
-        # if output.ndim == 3:
-        #     output = np.transpose(output[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
-        # output = (output * 255.0).round().astype(np.uint8)  # float32 to uint8
-
-        # # evaluate psnr/ssim/psnr_b
-        # if img_gt is not None:
-        #     img_gt = (img_gt * 255.0).round().astype(np.uint8)  # float32 to uint8
-        #     img_gt = img_gt[:h_old * scale, :w_old * scale, ...]  # crop gt
-        #     img_gt = np.squeeze(img_gt)
-
-        #     psnr = calculate_psnr(output, img_gt, crop_border=border)
-        #     ssim = calculate_ssim(output, img_gt, crop_border=border)
-        #     test_results['psnr'].append(psnr)
-        #     test_results['ssim'].append(ssim)
-        #     if img_gt.ndim == 3:  # RGB image
-        #         psnr_y = calculate_psnr(output, img_gt, crop_border=border, test_y_channel=True)
-        #         ssim_y = calculate_ssim(output, img_gt, crop_border=border, test_y_channel=True)
-        #         test_results['psnr_y'].append(psnr_y)
-        #         test_results['ssim_y'].append(ssim_y)
-        #     print('Testing {:d} {:20s} - PSNR: {:.2f} dB; SSIM: {:.4f}; '
-        #             'PSNR_Y: {:.2f} dB; SSIM_Y: {:.4f}; '
-        #             'PSNR_B: {:.2f} dB.; Inference time: {:.2f}'.
-        #             format(idx, imgname, psnr, ssim, psnr_y, ssim_y, psnr_b, timePerInference))
-        # else:
-        #     print('Testing {:d} {:20s}'.format(idx, imgname))
+        print(string + ", %s"%("Good" if check_res[1] < 2 and check_res[2] < 1e-4 else "Bad"))
+        print('Testing {:d} {:20s}  (TRT / PyTorch) - PSNR: {:.2f} dB / {:.2f} dB; SSIM: {:.4f} / {:.4f}; '
+                    'PSNR_Y: {:.2f} dB / {:.2f} dB; SSIM_Y: {:.4f} / {:.4f}; '
+                    'PSNR_B: {:.2f} dB / {:.2f} dB.; Inference time: {:.2f} / {:.2f}'.
+                    format(idx, imgname, psnr, gt_data["psnr"], ssim, gt_data["ssim"], psnr_y, gt_data["psnr_y"], ssim_y, gt_data["ssim_y"], psnr_b, gt_data["psnr_b"], timePerInference, gt_data["timePerInference"]))
 
 if __name__ == "__main__":
     testTRT()
