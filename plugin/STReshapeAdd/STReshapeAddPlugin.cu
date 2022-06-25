@@ -6,14 +6,16 @@ PluginFieldCollection    STReshapeAddPluginCreator::fc_ {};
 std::vector<PluginField> STReshapeAddPluginCreator::attr_;
 
 template<typename T>
-__global__ void STReshapeAddKernel(T *pInput, T *pAdd, int num_heads, int windows_pow, T *pOutput)
+__global__ void STReshapeAddKernel(T *pInput, T *pAdd1, T *pAdd2, int num_heads, int windows_pow, T *pOutput)
 {    
     const int index = blockIdx.x * 256 + threadIdx.x;
+    int hw = num_heads * windows_pow;
+    int addIndex1 = index % (num_heads * windows_pow);
     int B_ = index / (num_heads * windows_pow);
     int window_pos = index % windows_pow;
-    int addIndex = B_ * windows_pow + window_pos;
+    int addIndex2 = B_ * windows_pow + window_pos;
 
-    pOutput[index] = pInput[index] + pAdd[addIndex];
+    pOutput[index] = pInput[index] + pAdd1[addIndex1] + pAdd2[addIndex2];
 }
 
 int32_t STReshapeAddPlugin::enqueue(const PluginTensorDesc *inputDesc, const PluginTensorDesc *outputDesc, const void *const *inputs, void *const *outputs, void *workspace, cudaStream_t stream) noexcept
@@ -30,11 +32,11 @@ int32_t STReshapeAddPlugin::enqueue(const PluginTensorDesc *inputDesc, const Plu
     
     switch (int(inputDesc[0].type)){
         case int(DataType::kFLOAT):{
-            STReshapeAddKernel<float><<<grid, block, 0, stream>>>((float *)inputs[0], (float *)inputs[1], m.num_heads_, windows_pow, (float *)outputs[0]);
+            STReshapeAddKernel<float><<<grid, block, 0, stream>>>((float *)inputs[0], (float *)inputs[1], (float *)inputs[2], m.num_heads_, windows_pow, (float *)outputs[0]);
             break;
         }
         case int(DataType::kHALF):{
-            STReshapeAddKernel<half><<<grid, block, 0, stream>>>((half *)inputs[0], (half *)inputs[1], m.num_heads_, windows_pow, (half *)outputs[0]);
+            STReshapeAddKernel<half><<<grid, block, 0, stream>>>((half *)inputs[0], (half *)inputs[1], (half *)inputs[2], m.num_heads_, windows_pow, (half *)outputs[0]);
             break;
         }
         default:

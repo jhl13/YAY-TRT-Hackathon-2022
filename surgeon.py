@@ -1,9 +1,7 @@
 import argparse
-from cv2 import exp
 import onnx
 import onnx_graphsurgeon as gs
 import numpy as np
-from torch import float32
 
 def surgeon(onnx_path):
     # 读取 .onnx 并进行调整
@@ -217,9 +215,10 @@ def surgeon(onnx_path):
              node.o().o().o().o().o().op == "Reshape":
             FirstNode = node.o().o().o()
             LastNode = node.o().o().o().o().o()
+            positionNode = node.o().o()
             maskNode = node.o().o().o().o()
             STReshapeAddN = gs.Node("STReshapeAdd", "STReshapeAdd-" + str(nSTReshapeAdd), 
-                                    inputs=[FirstNode.inputs[0], maskNode.inputs[1]], 
+                                    inputs=[positionNode.inputs[0], positionNode.inputs[1], maskNode.inputs[1]], 
                                     outputs=[LastNode.outputs[0]],
                                     attrs={"type":6, "num_heads":6, "window_size": 8})
             graph.nodes.append(STReshapeAddN)
@@ -238,9 +237,8 @@ def surgeon(onnx_path):
                 Gather3Node = node.o(2)
                 MulNode = node.o().o()
                 MyGatherN = gs.Node("MyGather", "MyGather-" + str(nMyGather), 
-                                        inputs=[FirstNode.outputs[0]], 
-                                        outputs=[MulNode.outputs[0], Gather2Node.outputs[0], Gather3Node.outputs[0]],
-                                        attrs={"B":0.31622776601683794})
+                                        inputs=[FirstNode.outputs[0], MulNode.inputs[1]], 
+                                        outputs=[MulNode.outputs[0], Gather2Node.outputs[0], Gather3Node.outputs[0]])
                 graph.nodes.append(MyGatherN)
                 nMyGather += 1
                 MulNode.outputs = []

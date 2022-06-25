@@ -120,6 +120,8 @@ public:
             res = (inOut[pos].type == inOut[0].type); break;
         case 2:
             res = (inOut[pos].type == inOut[0].type); break;
+        case 3:
+            res = (inOut[pos].type == inOut[0].type); break;
         default:// should NOT be here
             res = false;
         }
