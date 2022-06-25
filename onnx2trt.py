@@ -45,9 +45,9 @@ def onnx2trt():
 
     config.profiling_verbosity = trt.ProfilingVerbosity.VERBOSE
     config.set_timing_cache(config.create_timing_cache(b""), ignore_mismatch=False)
-    # config.set_flag(trt.BuilderFlag.FP16)
-    # config.set_flag(trt.BuilderFlag.OBEY_PRECISION_CONSTRAINTS)
-    # config.clear_flag(trt.BuilderFlag.TF32)
+    config.set_flag(trt.BuilderFlag.FP16)
+    config.set_flag(trt.BuilderFlag.OBEY_PRECISION_CONSTRAINTS)
+    config.clear_flag(trt.BuilderFlag.TF32)
 
     engineString = builder.build_serialized_network(network, config)
 

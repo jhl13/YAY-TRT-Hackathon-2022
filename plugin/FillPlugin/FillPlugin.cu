@@ -21,12 +21,13 @@ using namespace nvinfer1;
 PluginFieldCollection FillPluginCreator::fc_{};
 std::vector<PluginField> FillPluginCreator::attr_;
 
-__global__ void fillKernel(float *pInput, float *pOutput)
+template<typename T>
+__global__ void fillKernel(T *pInput, T *pOutput)
 {
     const int tx = threadIdx.x, index = blockIdx.x * 256 + threadIdx.x;
 
-    if (pInput[index] > 0.1 || pInput[index] < -0.1){
-        pOutput[index] = -100.0;
+    if (pInput[index] > (T)0.1 || pInput[index] < (T)-0.1){
+        pOutput[index] = (T)-100.0;
     }
     else{
         pOutput[index] = 0.0;
@@ -42,7 +43,18 @@ int32_t FillPlugin::enqueue(const PluginTensorDesc* inputDesc, const PluginTenso
     }
 
     dim3 grid(CEIL_DIVIDE(nElement, 256), 1, 1), block(256, 1, 1);
-    fillKernel <<<grid, block, 0, stream>>>((float *)inputs[0], (float *)outputs[0]);
+    switch (int(inputDesc[0].type)){
+        case int(DataType::kFLOAT):{
+            fillKernel<float> <<<grid, block, 0, stream>>>((float *)inputs[0], (float *)outputs[0]);
+            break;
+        }
+        case int(DataType::kHALF):{
+            fillKernel<half> <<<grid, block, 0, stream>>>((half *)inputs[0], (half *)outputs[0]);
+            break;
+        }
+        default:
+            printf("DataType not support!\n");
+    }
     return 0;
 }
 

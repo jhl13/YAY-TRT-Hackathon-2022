@@ -134,11 +134,11 @@ public:
         switch(pos)
         {
         case 0:
-            res = (inOut[pos].type == DataType::kFLOAT); break;
+            res = (inOut[pos].type == DataType::kFLOAT || inOut[pos].type == DataType::kHALF); break;
         case 1:
-            res = (inOut[pos].type == DataType::kFLOAT); break;
+            res = (inOut[pos].type == inOut[0].type); break;
         case 2:
-            res = (inOut[pos].type == DataType::kFLOAT); break;
+            res = (inOut[pos].type == inOut[0].type); break;
         default:// should NOT be here
             res = false;
         }
@@ -148,7 +148,7 @@ public:
     DataType getOutputDataType(int outputIndex, const DataType* inputTypes, int nbInputs) const noexcept override
     {
         WHERE_AM_I();
-        return DataType::kFLOAT;
+        return inputTypes[0];
     }
 
     void configurePlugin(const DynamicPluginTensorDesc* in, int32_t nbInputs,const DynamicPluginTensorDesc* out, int32_t nbOutputs) noexcept override

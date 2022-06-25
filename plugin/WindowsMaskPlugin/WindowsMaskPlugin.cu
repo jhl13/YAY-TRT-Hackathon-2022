@@ -21,7 +21,8 @@ using namespace nvinfer1;
 PluginFieldCollection WindowsMaskPluginCreator::fc_{};
 std::vector<PluginField> WindowsMaskPluginCreator::attr_;
 
-__global__ void windowsMaskKernel(float *pInput, int *shape, float *pOutput, int nElement)
+template<typename T>
+__global__ void windowsMaskKernel(T *pInput, int *shape, T *pOutput, int nElement)
 {
     const int index = blockIdx.x * 256 + threadIdx.x;
     if (index > nElement){
@@ -34,31 +35,31 @@ __global__ void windowsMaskKernel(float *pInput, int *shape, float *pOutput, int
     int w = index % W;
     
     if (h < (H - 8) && w < (W - 8)){
-        pOutput[index] = 0;
+        pOutput[index] = (T)0;
     }
     else if (h < (H - 8) && w < (W - 4) && w >= (W - 8)){
-        pOutput[index] = 1;
+        pOutput[index] = (T)1;
     }
     else if (h < (H - 8) && w >= (W - 4)){
-        pOutput[index] = 2;
+        pOutput[index] = (T)2;
     }
     else if (h < (H - 4) && h >= (H - 8) && w < (W - 8)){
-        pOutput[index] = 3;
+        pOutput[index] = (T)3;
     }
     else if (h < (H - 4) && h >= (H - 8) && w < (W - 4) && w >= (W - 8)){
-        pOutput[index] = 4;
+        pOutput[index] = (T)4;
     }
     else if (h < (H - 4) && h >= (H - 8) && w >= (W - 4)){
-        pOutput[index] = 5;
+        pOutput[index] = (T)5;
     }
     else if (h >= (H - 4) && w < (W - 8)){
-        pOutput[index] = 6;
+        pOutput[index] = (T)6;
     }
     else if (h >= (H - 4) && w < (W - 4) && w >= (W - 8)){
-        pOutput[index] = 7;
+        pOutput[index] = (T)7;
     }
     else if (h >= (H - 4) && w >= (W - 4)){
-        pOutput[index] = 8;
+        pOutput[index] = (T)8;
     }
 }
 
@@ -71,9 +72,21 @@ int32_t WindowsMaskPlugin::enqueue(const PluginTensorDesc* inputDesc, const Plug
     }
 
     dim3 grid(CEIL_DIVIDE(nElement, 256), 1, 1), block(256, 1, 1); 
-    windowsMaskKernel <<<grid, block, 0, stream>>>((float *)inputs[0], (int *)inputs[1], (float *)outputs[0], nElement);
+    switch (int(inputDesc[0].type)){
+        case int(DataType::kFLOAT):{
+            windowsMaskKernel<float> <<<grid, block, 0, stream>>>((float *)inputs[0], (int *)inputs[1], (float *)outputs[0], nElement);
+            break;
+        }
+        case int(DataType::kHALF):{
+            windowsMaskKernel<half> <<<grid, block, 0, stream>>>((half *)inputs[0], (int *)inputs[1], (half *)outputs[0], nElement);
+            break;
+        }
+        default:
+            printf("DataType not support!\n");
+    }
+
+    
     return 0;
 }
-
 REGISTER_TENSORRT_PLUGIN(WindowsMaskPluginCreator);
 

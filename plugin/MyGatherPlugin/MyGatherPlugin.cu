@@ -5,7 +5,8 @@ using namespace nvinfer1;
 PluginFieldCollection    MyGatherPluginCreator::fc_ {};
 std::vector<PluginField> MyGatherPluginCreator::attr_;
 
-__global__ void MyGatherKernel(float *pInput, int nfea, float *pOutput0, float *pOutput1, float *pOutput2)
+template<typename T>
+__global__ void MyGatherKernel(T *pInput, int nfea, T *pOutput0, T *pOutput1, T *pOutput2)
 {
     const int index = blockIdx.x * 256 + threadIdx.x;
     int target_pos = index % nfea;
@@ -36,7 +37,18 @@ int32_t MyGatherPlugin::enqueue(const PluginTensorDesc *inputDesc, const PluginT
     }
 
     dim3 grid(CEIL_DIVIDE(nElement, 256), 1, 1), block(256, 1, 1);
-    MyGatherKernel<<<grid, block, 0, stream>>>((float *)inputs[0], nfea, (float *)outputs[0], (float *)outputs[1], (float *)outputs[2]);
+    switch (int(inputDesc[0].type)){
+        case int(DataType::kFLOAT):{
+            MyGatherKernel<float><<<grid, block, 0, stream>>>((float *)inputs[0], nfea, (float *)outputs[0], (float *)outputs[1], (float *)outputs[2]);
+            break;
+        }
+        case int(DataType::kHALF):{
+            MyGatherKernel<half><<<grid, block, 0, stream>>>((half *)inputs[0], nfea, (half *)outputs[0], (half *)outputs[1], (half *)outputs[2]);
+            break;
+        }
+        default:
+            printf("DataType not support!\n");
+    }
     return 0;
 }
 

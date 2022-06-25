@@ -5,7 +5,8 @@ using namespace nvinfer1;
 PluginFieldCollection    STReshapeRollPluginCreator::fc_ {};
 std::vector<PluginField> STReshapeRollPluginCreator::attr_;
 
-__global__ void STReshapeRollKernel(float *pInput, int fea_b, int fea_h, int fea_w, int fea_c, int shift, float *pOutput)
+template<typename T>
+__global__ void STReshapeRollKernel(T *pInput, int fea_b, int fea_h, int fea_w, int fea_c, int shift, T *pOutput)
 {
     const int index = blockIdx.x * 256 + threadIdx.x;
     int w = index / fea_c % fea_w;
@@ -28,21 +29,29 @@ int32_t STReshapeRollPlugin::enqueue(const PluginTensorDesc *inputDesc, const Pl
         nElement *= inputDesc[0].dims.d[i];
     }
 
-    dim3 grid(CEIL_DIVIDE(nElement, 256), 1, 1), block(256, 1, 1); 
+    dim3 grid(CEIL_DIVIDE(nElement, 256), 1, 1), block(256, 1, 1);
+    int fea_b = 0, fea_h = 0, fea_w = 0, fea_c = 0;
     if (m.type_ == 0){
-        int fea_b = inputDesc[1].dims.d[0], fea_h = inputDesc[1].dims.d[2], fea_w = inputDesc[1].dims.d[3], fea_c = inputDesc[1].dims.d[1];
-        // int fea_b = 1, fea_h = 256, fea_w = 256, fea_c = 60;
-        // printf("0-- fea_b:%d, fea_h:%d, fea_w:%d, fea_c:%d \n", fea_b, fea_h, fea_w, fea_c);
-        STReshapeRollKernel<<<grid, block, 0, stream>>>((float *)inputs[0], fea_b, fea_h, fea_w, fea_c, m.shift_, (float *)outputs[0]);
+        fea_b = inputDesc[1].dims.d[0], fea_h = inputDesc[1].dims.d[2], fea_w = inputDesc[1].dims.d[3], fea_c = inputDesc[1].dims.d[1];
     }
     else if (m.type_ == 1){
-        int fea_b = inputDesc[0].dims.d[0], fea_h = inputDesc[0].dims.d[1] * m.window_size_, fea_w = inputDesc[0].dims.d[3] * m.window_size_, fea_c = inputDesc[1].dims.d[2];
-        // int fea_b = 1, fea_h = 256, fea_w = 256, fea_c = 60;
-        // printf("1-- fea_b:%d, fea_h:%d, fea_w:%d, fea_c:%d \n", fea_b, fea_h, fea_w, fea_c);
-        STReshapeRollKernel<<<grid, block, 0, stream>>>((float *)inputs[0], fea_b, fea_h, fea_w, fea_c, m.shift_, (float *)outputs[0]);
+        fea_b = inputDesc[0].dims.d[0], fea_h = inputDesc[0].dims.d[1] * m.window_size_, fea_w = inputDesc[0].dims.d[3] * m.window_size_, fea_c = inputDesc[1].dims.d[2];
     }
     else{
         printf("No implement!");
+    }
+    
+    switch (int(inputDesc[0].type)){
+        case int(DataType::kFLOAT):{
+            STReshapeRollKernel<float><<<grid, block, 0, stream>>>((float *)inputs[0], fea_b, fea_h, fea_w, fea_c, m.shift_, (float *)outputs[0]);
+            break;
+        }
+        case int(DataType::kHALF):{
+            STReshapeRollKernel<half><<<grid, block, 0, stream>>>((half *)inputs[0], fea_b, fea_h, fea_w, fea_c, m.shift_, (half *)outputs[0]);
+            break;
+        }
+        default:
+            printf("DataType not support!\n");
     }
     return 0;
 }

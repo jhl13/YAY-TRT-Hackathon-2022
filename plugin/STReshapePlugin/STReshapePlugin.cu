@@ -21,7 +21,8 @@ using namespace nvinfer1;
 PluginFieldCollection STReshapePluginCreator::fc_{};
 std::vector<PluginField> STReshapePluginCreator::attr_;
 
-__global__ void STReshapeKernel(float *pInput, float *pOutput, int nElement)
+template<typename T>
+__global__ void STReshapeKernel(T *pInput, T *pOutput, int nElement)
 {
     const int index = blockIdx.x * 256 + threadIdx.x;
     if (index > nElement){
@@ -38,8 +39,20 @@ int32_t STReshapePlugin::enqueue(const PluginTensorDesc* inputDesc, const Plugin
         nElement *= inputDesc[0].dims.d[i];
     }
 
-    dim3 grid(CEIL_DIVIDE(nElement, 256), 1, 1), block(256, 1, 1); 
-    STReshapeKernel <<<grid, block, 0, stream>>>((float *)inputs[0], (float *)outputs[0], nElement);
+    dim3 grid(CEIL_DIVIDE(nElement, 256), 1, 1), block(256, 1, 1);
+    switch (int(inputDesc[0].type)){
+        case int(DataType::kFLOAT):{
+            STReshapeKernel<float> <<<grid, block, 0, stream>>>((float *)inputs[0], (float *)outputs[0], nElement);
+            break;
+        }
+        case int(DataType::kHALF):{
+            STReshapeKernel<half> <<<grid, block, 0, stream>>>((half *)inputs[0], (half *)outputs[0], nElement);
+            break;
+        }
+        default:
+            printf("DataType not support!\n");
+    }
+
     return 0;
 }
 
