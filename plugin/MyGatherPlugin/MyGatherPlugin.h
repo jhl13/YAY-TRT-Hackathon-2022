@@ -45,18 +45,19 @@ class MyGatherPlugin: public IPluginV2DynamicExt
 private:    
     std::string name_;
     std::string namespace_;
-    int dim_;
+    float B_ = 0;
 
 public:
-    MyGatherPlugin(const std::string& name, int dim) : name_(name), dim_(dim)
+    MyGatherPlugin(const std::string& name, float B) : name_(name)
     {
+        B_ = B;
         WHERE_AM_I();
     }
 
     MyGatherPlugin(const std::string& name, const void* data, size_t length) : name_(name)
     {
         WHERE_AM_I();
-        memcpy(&dim_, data, sizeof(dim_));
+        memcpy(&B_, data, sizeof(B_));
     }
     
     MyGatherPlugin() = delete;
@@ -69,7 +70,7 @@ public:
     size_t getSerializationSize() const noexcept override
     {
         WHERE_AM_I();
-        return sizeof(dim_);
+        return sizeof(B_);
     }
     
     void serialize(void *buffer) const noexcept override
@@ -80,7 +81,7 @@ public:
     IPluginV2DynamicExt* clone() const noexcept override
     {
         WHERE_AM_I();
-        return new MyGatherPlugin(name_, dim_);
+        return new MyGatherPlugin(name_, B_);
     }
 
     int getNbOutputs() const noexcept override
@@ -192,7 +193,7 @@ private:
 public:
     MyGatherPluginCreator()
     {
-        attr_.emplace_back(PluginField("dim", nullptr, PluginFieldType::kINT32, 1));
+        attr_.emplace_back(PluginField("B", nullptr, PluginFieldType::kFLOAT32, 1));
         fc_.nbFields = attr_.size();
         fc_.fields = attr_.data();
     }
@@ -202,16 +203,16 @@ public:
     IPluginV2* createPlugin(const char* name, const PluginFieldCollection* fc) noexcept override
     {
         WHERE_AM_I();
-        int dim {0};
+        float B {0};
         for (int i = 0; i < fc->nbFields; i++)
         {
             std::string field_name(fc->fields[i].name);
-            if (field_name.compare("dim") == 0)
+            if (field_name.compare("B") == 0)
             {
-                dim = *static_cast<const int *>(fc->fields[i].data);
+                B = *static_cast<const float *>(fc->fields[i].data);
             }
         }
-        return new MyGatherPlugin(name, dim);
+        return new MyGatherPlugin(name, B);
     }
 
     IPluginV2* deserializePlugin(const char* name, const void* serialData, size_t serialLength) noexcept override

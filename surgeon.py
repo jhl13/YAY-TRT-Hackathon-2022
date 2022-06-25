@@ -3,6 +3,7 @@ from cv2 import exp
 import onnx
 import onnx_graphsurgeon as gs
 import numpy as np
+from torch import float32
 
 def surgeon(onnx_path):
     # 读取 .onnx 并进行调整
@@ -235,13 +236,14 @@ def surgeon(onnx_path):
                 Gather1Node = node.o()
                 Gather2Node = node.o(1)
                 Gather3Node = node.o(2)
+                MulNode = node.o().o()
                 MyGatherN = gs.Node("MyGather", "MyGather-" + str(nMyGather), 
                                         inputs=[FirstNode.outputs[0]], 
-                                        outputs=[Gather1Node.outputs[0], Gather2Node.outputs[0], Gather3Node.outputs[0]],
-                                        attrs={"dim":0})
+                                        outputs=[MulNode.outputs[0], Gather2Node.outputs[0], Gather3Node.outputs[0]],
+                                        attrs={"B":0.31622776601683794})
                 graph.nodes.append(MyGatherN)
                 nMyGather += 1
-                Gather1Node.outputs = []
+                MulNode.outputs = []
                 Gather2Node.outputs = []
                 Gather3Node.outputs = []
         except:
