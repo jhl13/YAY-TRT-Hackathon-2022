@@ -134,7 +134,7 @@ class WindowAttention(nn.Module):
             # attn shape:[1, B_, 6, N, N], mask shape:[1, B_, 1, N, N]
             attn = attn.view(B_ // mask.shape[0], mask.shape[0], self.num_heads, N, N) + mask.unsqueeze(1).unsqueeze(0)
             attn = attn.view(-1, self.num_heads, N, N)
-            attn = self.softmax(attn)
+            attn = self.softmax(attn)  # 很耗时
         else:
             attn = self.softmax(attn)
 
@@ -400,7 +400,7 @@ class BasicLayer(nn.Module):
                 x = checkpoint.checkpoint(blk, x, x_size)
             else:
                 if i % 2 == 0:
-                    x = blk(x, x_size, mask)
+                    x = blk(x, x_size)
                 else:
                     x = blk(x, x_size, mask_shift)
         if self.downsample is not None:

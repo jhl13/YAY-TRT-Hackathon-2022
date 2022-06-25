@@ -23,13 +23,15 @@ def surgeon(onnx_path):
     nSTReshapeAdd = 0
     nMyGather = 0
     for node_id, node in enumerate(graph.nodes):
-        if node.name == "ConstantOfShape_121": # ConstantOfShape_121
-            ConstantOfShapeNode = node
-        if node.name == "Shape_143": # Shape_143
-            ShapeNode = node
-        if node.name == "ScatterND_1084": # ScatterND_1084
+        try:
+            if node.op == "ConstantOfShape" and node.o(5).op == "Shape":
+                ConstantOfShapeNode = node
+                ShapeNode = node.o(5)
+        except:
+            pass
+        if node.op == "ScatterND":
             ScatterNDNode = node
-        if node.name == "Conv_56":
+        if node.op == "Conv" and ConvNode is None:
             ConvNode = node
 
         if node.op == 'ReduceMean' and \
@@ -66,7 +68,6 @@ def surgeon(onnx_path):
             graph.nodes.append(FillN)
             lastNode.outputs = []
             nFill += 1
-
     graph.cleanup().toposort()
 
     if ConstantOfShapeNode is not None and ShapeNode is not None and ScatterNDNode is not None:
@@ -187,26 +188,28 @@ def surgeon(onnx_path):
             break
 
     for node_id, node in enumerate(graph.nodes):
-        if node.op == "STReshape" and node.o().op == "Shape" and node.o(3).op == "MatMul" and node.o(3).o().op == "Add" and \
-            node.o(3).o().o().op == "Reshape":
-            reshapeNode = node.o(3).o().o()
-            STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
-                                    inputs=[reshapeNode.inputs[0], FirstSTReshapeNode.outputs[0]], 
-                                    outputs=[reshapeNode.outputs[0]],
-                                    attrs={"type":5, "num_heads":6, "window_size":8})
-            graph.nodes.append(STReshapeN)
-            nSTReshape += 1
-            reshapeNode.outputs = []
+        # # 可不用
+        # if node.op == "STReshape" and node.o().op == "Shape" and node.o(3).op == "MatMul" and node.o(3).o().op == "Add" and \
+        #     node.o(3).o().o().op == "Reshape":
+        #     reshapeNode = node.o(3).o().o()
+        #     STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
+        #                             inputs=[reshapeNode.inputs[0], FirstSTReshapeNode.outputs[0]], 
+        #                             outputs=[reshapeNode.outputs[0]],
+        #                             attrs={"type":5, "num_heads":6, "window_size":8})
+        #     graph.nodes.append(STReshapeN)
+        #     nSTReshape += 1
+        #     reshapeNode.outputs = []
 
-        if node.op == "Softmax" and node.o().op == "MatMul" and node.o().o().op == "Transpose" and node.o().o().o().op == "Reshape":
-            reshapeNode = node.o().o().o()
-            STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
-                                    inputs=[reshapeNode.inputs[0], FirstSTReshapeNode.outputs[0]], 
-                                    outputs=[reshapeNode.outputs[0]],
-                                    attrs={"type":6, "num_heads":6, "window_size":8})
-            graph.nodes.append(STReshapeN)
-            nSTReshape += 1
-            reshapeNode.outputs = []
+        # # 可不用
+        # if node.op == "Softmax" and node.o().op == "MatMul" and node.o().o().op == "Transpose" and node.o().o().o().op == "Reshape":
+        #     reshapeNode = node.o().o().o()
+        #     STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
+        #                             inputs=[reshapeNode.inputs[0], FirstSTReshapeNode.outputs[0]], 
+        #                             outputs=[reshapeNode.outputs[0]],
+        #                             attrs={"type":6, "num_heads":6, "window_size":8})
+        #     graph.nodes.append(STReshapeN)
+        #     nSTReshape += 1
+        #     reshapeNode.outputs = []
 
         if node.op == "Mul" and node.o().op == "MatMul" and node.o().o().op == "Add" and \
             node.o().o().o().op == "Reshape" and node.o().o().o().o().op == "Add" and \
