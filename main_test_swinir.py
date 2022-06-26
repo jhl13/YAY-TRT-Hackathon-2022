@@ -55,6 +55,7 @@ def main():
     test_results['psnr_y'] = []
     test_results['ssim_y'] = []
     test_results['psnr_b'] = []
+    test_results['timePerInference'] = []
     psnr, ssim, psnr_y, ssim_y, psnr_b = 0, 0, 0, 0, 0
 
     for idx, path in enumerate(sorted(glob.glob(os.path.join(folder, '*.png')))):
@@ -100,6 +101,7 @@ def main():
             ssim = util.calculate_ssim(output, img_gt, crop_border=border)
             test_results['psnr'].append(psnr)
             test_results['ssim'].append(ssim)
+            test_results['timePerInference'].append(timePerInference)
             if img_gt.ndim == 3:  # RGB image
                 psnr_y = util.calculate_psnr(output, img_gt, crop_border=border, test_y_channel=True)
                 ssim_y = util.calculate_ssim(output, img_gt, crop_border=border, test_y_channel=True)
@@ -122,6 +124,7 @@ def main():
     if img_gt is not None:
         ave_psnr = sum(test_results['psnr']) / len(test_results['psnr'])
         ave_ssim = sum(test_results['ssim']) / len(test_results['ssim'])
+        ave_timePerInference = sum(test_results['timePerInference']) / len(test_results['timePerInference'])
         print('\n{} \n-- Average PSNR/SSIM(RGB): {:.2f} dB; {:.4f}'.format(save_dir, ave_psnr, ave_ssim))
         if img_gt.ndim == 3:
             ave_psnr_y = sum(test_results['psnr_y']) / len(test_results['psnr_y'])
@@ -130,7 +133,7 @@ def main():
         if args.task in ['jpeg_car']:
             ave_psnr_b = sum(test_results['psnr_b']) / len(test_results['psnr_b'])
             print('-- Average PSNR_B: {:.2f} dB'.format(ave_psnr_b))
-
+        print('\nAverage timePerInference: {:.2f} ms'.format(ave_timePerInference))
 
 def define_model(args):
     # 001 classical image sr
