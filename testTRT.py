@@ -343,6 +343,7 @@ def testTRT():
     test_results['ssim_y'] = []
     test_results['psnr_b'] = []
     test_results['timePerInference'] = []
+    test_results['pixel_err'] = []
     psnr, ssim, psnr_y, ssim_y, psnr_b = 0, 0, 0, 0, 0
 
     for idx, path in enumerate(sorted(glob(os.path.join(folder_gt, '*.png')))):
@@ -426,11 +427,13 @@ def testTRT():
                     'PSNR_Y: {:.2f} dB / {:.2f} dB; SSIM_Y: {:.4f} / {:.4f}; '
                     'PSNR_B: {:.2f} dB / {:.2f} dB.; Inference time: {:.2f} / {:.2f}'.
                     format(idx, imgname, psnr, gt_data["psnr"], ssim, gt_data["ssim"], psnr_y, gt_data["psnr_y"], ssim_y, gt_data["ssim_y"], psnr_b, gt_data["psnr_b"], timePerInference, gt_data["timePerInference"]))
+        test_results['pixel_err'].append(check_res[1])
     # summarize psnr/ssim
     if img_gt is not None:
         ave_psnr = sum(test_results['psnr']) / len(test_results['psnr'])
         ave_ssim = sum(test_results['ssim']) / len(test_results['ssim'])
         ave_timePerInference = sum(test_results['timePerInference']) / len(test_results['timePerInference'])
+        ave_pixel_err = sum(test_results['pixel_err']) / len(test_results['pixel_err'])
         print('\nAverage PSNR/SSIM(RGB): {:.2f} dB; {:.4f}'.format(ave_psnr, ave_ssim))
         if img_gt.ndim == 3:
             ave_psnr_y = sum(test_results['psnr_y']) / len(test_results['psnr_y'])
@@ -439,6 +442,7 @@ def testTRT():
         if task in ['jpeg_car']:
             ave_psnr_b = sum(test_results['psnr_b']) / len(test_results['psnr_b'])
             print('-- Average PSNR_B: {:.2f} dB'.format(ave_psnr_b))
-        print('\nAverage timePerInference: {:.2f} ms'.format(ave_timePerInference))
+        print('Average timePerInference: {:.2f} ms'.format(ave_timePerInference))
+        print('Average pixel_err: {:.2f} pixel'.format(ave_pixel_err))
 if __name__ == "__main__":
     testTRT()
