@@ -19,23 +19,28 @@
 
 ### 模型优化的难点
 
-**目前遇到的问题**  
-1. PyTorch模型导出ONNX模型时，会形成大量的算子  
-16.4MB的002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth模型导出ONNX后，ONNX包含了29308个节点/13420-BasicLayer/7462-RSTB/6559-只保留shift-mask计算过程  
-64.2MB的001_classicalSR_DF2K_s64w8_SwinIR-M_x2.pth模型导出ONNX后，ONNX包含了43819个节点  
-而初赛中，136MB的encoder模型导出ONNX后，只有1990个节点  
-大量的节点导致导出ONNX时很容易出现显存不足的问题。在导ONNX模型后发现，很多节点其实是涉及形状操作的节点，后续解决思路有两个：1、从源代码出发，删除或合一些形状相关的操作；2、对ONNX网络进行修改。  
-<br/>
+**PyTorch模型导出ONNX模型时，会形成大量的算子**
+16.4MB的002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth模型导出ONNX后，ONNX包含了29308个节点。64.2MB的001_classicalSR_DF2K_s64w8_SwinIR-M_x2.pth模型导出ONNX后，ONNX包含了43819个节点。而初赛中，136MB的encoder模型导出ONNX后，只有1990个节点。大量的节点导致导出ONNX时很容易出现显存不足的问题，同时也不利于ONNX模型的可视化和分析。  
 
-1. ONNX模型转TRT时，会有尺寸相关报错信息  
-初步定位到的问题是原模型保存了attention mask，导致导出ONNX时把mask当成是一个常量，而不是一个随着输入图像尺寸变化而变化的变量。后续解决思路有两个：1、在网络前向时才生成mask；2、提前计算好mask，把mask当成输入。  
+**动态范围更广**
+相比于检测/分割等高级语义任务，SwinIR是一个用于低级语义任务的模型，其动态推理要求更高。如检测任务中，常见的动态推理通常只限于batch层面的动态，而输入图片尺寸H/W是固定的。但是在超分、去噪、JPEG压缩等任务中，往往不能提前将输入图片resize成某一固定尺寸，而是要求原图尺寸输入，所以低级语义任务中，输入尺寸H/W也需要是动态的。因为推理过程中需要动态获取H/W信息，所以这也是产生额外shape相关节点的原因之一。  
+
+**转换TRT模型时，涉及形状相关的操作会报错**
+SwinIR模型转换为ONNX模型后，产生大量算子的原因有两个：1、计算attention mask需要使用大量的算子；2、模型中存在大量reshape相关的操作，因为动态推理中reshape操作需要在运行过程中获取shape信息，所以会产生大量的shape相关的算子。而这些涉及到shape相关操作的部分，在ONNX转TRT过程中会报错。  
+![menSize](./figs/memSize.png)  
+![gather](./figs/gather.png) 
 
 ## 优化过程  
+
+**Docker**  
+建议使用[NGC](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tensorrt)  
+目前官方docker环境中配置的TensorRT版本为8.2.4，但本项目代码在TensorRT 8.2.4与TensorRT 8.4.1.5中均通过测试。
 
 **安装**  
 ```bash
 apt-get install libgl1-mesa-glx
-pip install -r requirments.txt # 有可能需要单独先安装 nvidia-pyindex
+pip install nvidia-pyindex # 需要单独先安装 nvidia-pyindex
+pip install -r requirments.txt 
 ```
 
 
@@ -43,17 +48,49 @@ pip install -r requirments.txt # 有可能需要单独先安装 nvidia-pyindex
 ```bash
 cd model_zoo/swinir
 chmod +x ./download.sh
+# 为了节省时间，只下载部分模型，需要下载其他模型，可以对脚本进行修改
 ./download.sh
 ```
 
 **PyTorch测评**
 ```python
+# Classical Image Super-Resolution
+python main_test_swinir.py --task classical_sr --scale 2 --training_patch_size 64 --model_path model_zoo/swinir/001_classicalSR_DF2K_s64w8_SwinIR-M_x2.pth --folder_lq testsets/Set5/LR_bicubic/X2 --folder_gt testsets/Set5/HR
+
+# Lightweight Image Super-Resolution
 python main_test_swinir.py --task lightweight_sr --scale 2 --model_path model_zoo/swinir/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth --folder_lq testsets/Set5/LR_bicubic/X2 --folder_gt testsets/Set5/HR
+
+# Real-World Image Super-Resolution
+python main_test_swinir.py --task real_sr --scale 2 --model_path model_zoo/swinir/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN.pth --folder_lq testsets/RealSRSet+5images
+
+# Color Image Deoising
+python main_test_swinir.py --task color_dn --noise 15 --model_path model_zoo/swinir/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.pth --folder_gt testsets/McMaster
+
+# JPEG Compression Artifact Reduction
+python main_test_swinir.py --task jpeg_car --jpeg 10 --model_path model_zoo/swinir/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10.pth --folder_gt testsets/classic5
 ```
 
 **导出ONNX模型**
 ```python
+# Classical Image Super-Resolution
+python export.py --task classical_sr --scale 2 --training_patch_size 64 --model_path model_zoo/swinir/001_classicalSR_DF2K_s64w8_SwinIR-M_x2.pth --folder_lq testsets/Set5/LR_bicubic/X2 --folder_gt testsets/Set5/HR
+
+# Lightweight Image Super-Resolution
 python export.py --task lightweight_sr --scale 2 --model_path model_zoo/swinir/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth --folder_lq testsets/Set5/LR_bicubic/X2 --folder_gt testsets/Set5/HR
+
+# Real-World Image Super-Resolution
+python export.py --task real_sr --scale 2 --model_path model_zoo/swinir/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN.pth --folder_lq testsets/RealSRSet+5images
+
+# Color Image Deoising
+python export.py --task color_dn --noise 15 --model_path model_zoo/swinir/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.pth --folder_gt testsets/McMaster
+
+# JPEG Compression Artifact Reduction
+python export.py --task jpeg_car --jpeg 10 --model_path model_zoo/swinir/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10.pth --folder_gt testsets/classic5
+```
+
+**ONNX surgeon**
+```python
+
 ```
 
 **导出TensorRT模型**

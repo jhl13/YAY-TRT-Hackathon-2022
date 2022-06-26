@@ -346,7 +346,13 @@ def testTRT():
     test_results['pixel_err'] = []
     psnr, ssim, psnr_y, ssim_y, psnr_b = 0, 0, 0, 0, 0
 
-    for idx, path in enumerate(sorted(glob(os.path.join(folder_gt, '*.png')))):
+    tmp_list = sorted(glob.glob(os.path.join(folder_gt, '*')))
+    img_list = []
+    for img_path in tmp_list:
+        if img_path[-3:] != "npz":
+            img_list.append(img_path)
+
+    for idx, path in enumerate(img_list):
         imgname, img_lq, img_gt = get_image_pair(task, path)  # image to HWC-BGR, float32
         img_lq = np.transpose(img_lq if img_lq.shape[2] == 1 else img_lq[:, :, [2, 1, 0]], (2, 0, 1))  # HCW-BGR to CHW-RGB
         img_lq = img_lq[np.newaxis, :, :, :]

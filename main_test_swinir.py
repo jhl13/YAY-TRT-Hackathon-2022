@@ -16,7 +16,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--task', type=str, default='classical_sr', help='classical_sr, lightweight_sr, real_sr, '
                                                                      'gray_dn, color_dn, jpeg_car')
-    parser.add_argument('--scale', type=int, default=2, help='scale factor: 1, 2, 3, 4, 8') # 1 for dn and jpeg car
+    parser.add_argument('--scale', type=int, default=1, help='scale factor: 1, 2, 3, 4, 8') # 1 for dn and jpeg car
     parser.add_argument('--noise', type=int, default=15, help='noise level: 15, 25, 50')
     parser.add_argument('--jpeg', type=int, default=40, help='scale factor: 10, 20, 30, 40')
     parser.add_argument('--training_patch_size', type=int, default=48, help='patch size used in training SwinIR. '
@@ -58,7 +58,13 @@ def main():
     test_results['timePerInference'] = []
     psnr, ssim, psnr_y, ssim_y, psnr_b = 0, 0, 0, 0, 0
 
-    for idx, path in enumerate(sorted(glob.glob(os.path.join(folder, '*.png')))):
+    tmp_list = sorted(glob.glob(os.path.join(folder, '*')))
+    img_list = []
+    for img_path in tmp_list:
+        if img_path[-3:] != "npz":
+            img_list.append(img_path)
+
+    for idx, path in enumerate(img_list):
         # read image
         imgname, img_lq, img_gt = get_image_pair(args, path)  # image to HWC-BGR, float32
         img_lq = np.transpose(img_lq if img_lq.shape[2] == 1 else img_lq[:, :, [2, 1, 0]], (2, 0, 1))  # HCW-BGR to CHW-RGB
@@ -68,18 +74,19 @@ def main():
         with torch.no_grad():
             # pad input image to be a multiple of window_size
             _, _, h_old, w_old = img_lq.size()
+            # resize这一部分已经放到了模型里面
             # h_pad = (h_old // window_size + 1) * window_size - h_old
             # w_pad = (w_old // window_size + 1) * window_size - w_old
             # img_lq = torch.cat([img_lq, torch.flip(img_lq, [2])], 2)[:, :, :h_old + h_pad, :]
             # img_lq = torch.cat([img_lq, torch.flip(img_lq, [3])], 3)[:, :, :, :w_old + w_pad]
             print(img_lq.shape)
-            for i in range(10):
+            for i in range(1):
                 output = test(img_lq, model, args, window_size)
             t0 = time_ns()
-            for i in range(30):
+            for i in range(2):
                 output = test(img_lq, model, args, window_size)
             t1 = time_ns()
-            timePerInference = (t1-t0)/1000/1000/30
+            timePerInference = (t1-t0)/1000/1000/2
             # timePerInference = 0
             output = test(img_lq, model, args, window_size)
             output = output[..., :h_old * args.scale, :w_old * args.scale]
@@ -96,7 +103,6 @@ def main():
             img_gt = (img_gt * 255.0).round().astype(np.uint8)  # float32 to uint8
             img_gt = img_gt[:h_old * args.scale, :w_old * args.scale, ...]  # crop gt
             img_gt = np.squeeze(img_gt)
-
             psnr = util.calculate_psnr(output, img_gt, crop_border=border)
             ssim = util.calculate_ssim(output, img_gt, crop_border=border)
             test_results['psnr'].append(psnr)
