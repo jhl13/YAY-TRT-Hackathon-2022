@@ -52,7 +52,7 @@ def export():
     onnx_file = os.path.join(save_dir, onnx_name)
     os.makedirs(save_dir, exist_ok=True)
 
-    x = torch.randn((1, 3, window_size*32, window_size*32), requires_grad=False).to(device)
+    x = torch.randn((1, 3, window_size*8, window_size*8), requires_grad=False).to(device)
     torch.onnx.export(model, 
                      (x), 
                      onnx_file, 

@@ -90,17 +90,29 @@ python export.py --task jpeg_car --jpeg 10 --model_path model_zoo/swinir/006_CAR
 
 **ONNX surgeon**
 ```python
+# Classical Image Super-Resolution
+python surgeon.py --onnxFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_DF2K_s64w8_SwinIR-M_x2.onnx
 
+# Lightweight Image Super-Resolution
+python surgeon.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.onnx
 ```
 
 **导出TensorRT模型**
 ```python
-python onnx2trt.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.onnx
+# Classical Image Super-Resolution
+python onnx2trt.py --onnxFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_DF2K_s64w8_SwinIR-M_x2_surgeon.onnx
+
+# Lightweight Image Super-Resolution
+python onnx2trt.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.onnx
 ```
 
-**测试TensorRT模型**(目前只支持固定尺寸，不支持动态尺寸)  
+**测试TensorRT模型**(支持动态尺寸)  
 ```python
-python testTRT.py
+# Classical Image Super-Resolution
+python testTRT.py --onnxFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_DF2K_s64w8_SwinIR-M_x2 --TRTFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.plan
+
+# Lightweight Image Super-Resolution
+python testTRT.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.onnx --TRTFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.plan
 ```
 
 

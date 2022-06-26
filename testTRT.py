@@ -346,7 +346,7 @@ def testTRT():
     test_results['pixel_err'] = []
     psnr, ssim, psnr_y, ssim_y, psnr_b = 0, 0, 0, 0, 0
 
-    tmp_list = sorted(glob.glob(os.path.join(folder_gt, '*')))
+    tmp_list = sorted(glob(os.path.join(folder_gt, '*')))
     img_list = []
     for img_path in tmp_list:
         if img_path[-3:] != "npz":
