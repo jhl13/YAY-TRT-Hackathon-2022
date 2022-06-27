@@ -2,7 +2,7 @@
 **队伍名称**：摇阿摇  
 **复赛优化模型**：[SwinIR-测试](https://github.com/JingyunLiang/SwinIR)  
 上述链接中只包含测试代码，如果需要训练代码，请查看[SwinIR-训练](https://github.com/cszn/KAIR/blob/master/docs/README_SwinIR.md)  
-在复赛过程中我们只对训练好的模型进行优化加速，所以只使用测试代码就足够了，本项目对SwinIR中的超分、去噪、JPEG压缩伪影去除三个任务分别进行了TensorRT模型转化  
+在复赛过程中我们只对训练好的模型进行优化加速，所以只使用测试代码就足够了，本项目对SwinIR中的超分、去噪两个任务分别进行了TensorRT模型转化  
 
 ## 原始模型
 ### 模型简介
@@ -62,8 +62,10 @@ SwinIR模型转换为ONNX模型后，产生大量算子的原因有两个：1、
 └── README.md
 ```
 
+前面四个部分（原PyTorch模型优化、shape相关节点的优化、Window mask 优化、Gather 优化）的优化是为了能让模型正常运行起来。后面两个部分（Nsight Systems 优化、FP16模式 优化）是为了让模型跑更快。
+
 **原PyTorch模型优化**  
-原代码模型存在大量的冗余计算，如window mask的计算会在每个block中重复计算，而这些block的window mask是一样的，将这些window mask计算提前，并且以参数形式传入每个block中，可以大量减少onnx模型的节点数量，且可以提升模型的速度。如16.4MB的002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth模型导出ONNX后，ONNX包含了29308个节点。经过改进后的PyTorch模型只有6178个节点，节点数只有原来的21%。速度上也有所提升，可见[精度与加速效果](#精度与加速效果)
+原代码模型存在大量的冗余计算，如window mask的计算会在每个block中重复计算，而这些block的window mask是一样的，将这些window mask计算提前，并且以参数形式传入每个block中，可以大量减少onnx模型的节点数量，且可以提升模型的速度。如16.4MB的002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth模型导出ONNX后，ONNX包含了29308个节点。经过改进后的PyTorch模型只有6178个节点，节点数只有原来的21%。速度上也有所提升，可见[精度与加速效果](#精度与加速效果)。
 
 **shape相关节点的优化**  
 在测试过程中，转化TRT模型时会出现以下报错  
@@ -73,14 +75,28 @@ SwinIR模型转换为ONNX模型后，产生大量算子的原因有两个：1、
 上述为reshape相关plugin算子中的getOutputDimensions函数，其中input[1]是一个参考tensor，其并不参与真实的计算，只用来计算output tensor的shape。使用surgeon.py文件可以  
 
 **Window mask 优化**  
+shift mask的编号赋值操作（下图中红框的位置），会在转换onnx模型是产生上千个节点，且直接转换TRT模型会报错，我们把这部分的操作写成了WindowsMaskPlugin。  
+![mask](./figs/mask.png)  
+下面为直接转换的报错信息，与shape相关操作的报错信息一致
+![maskerr](./figs/maskerr.png)  
+且换成Plugin之后，该部分的计算时间由13ms降至0.21ms。
 
 **Gather 优化**  
+gather操作对应的是代码中得到q、k、v的操作，直接转TRT模型会发生下图的报错  
+![gather_code](./figs/gather_code.png)  
+![gather图](./figs/gather图.png)  
+![gather](./figs/gather.png)  
+最终我们将其写成了MyGatherPlugin
 
 **Nsight Systems 优化**  
 使用Nsight System进行可视化后，发现有个占总耗时6%左右的scale算子，其是在Reshape相关的plugin周围的算子，而且是较为简单的Add节点，我们进一步将这部分的节点融进plugin中，减少Kernel调用的时间。
 ![nsight](./figs/nsight.png)  
+将这些节点合并入plugin后，再使用Nsight System进行可视化，可以看到运行时间由121ms下降到了179ms。且scale节点已不存在。
+![nsight2](./figs/nsight2.png)  
 
 **FP16模式 优化**  
+经过上面的优化，在超分去噪任务中，PyTorch模型都可以转化为FP32的TRT模型，但是在FP16中，三个模型的精度下降都比较大，为此，我们将LayerNorm plugin(初赛中效果较好，直接沿用)中的计算更换为float类型计算，计算完之后再转化为相应的输出类型，从而实现Lightweight Image Super-Resolution任务的模型能转换为符合精度要求的FP16模型，但遗憾的是，Classical Image Super-Resolution任务和Color Image Denoising任务的FP16模型精度还是不符合要求。
+![layernorm](./figs/layernorm.png) 
 
 ## 测试流程
 **Docker**  
@@ -117,9 +133,6 @@ python main_test_swinir.py --task lightweight_sr --scale 2 --model_path model_zo
 
 # Color Image Denoising
 python main_test_swinir.py --task color_dn --noise 15 --model_path model_zoo/swinir/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.pth --folder_gt testsets/McMaster
-
-# JPEG Compression Artifact Reduction
-python main_test_swinir.py --task jpeg_car --jpeg 10 --model_path model_zoo/swinir/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10.pth --folder_gt testsets/classic5
 ```
 
 **导出ONNX模型**
@@ -132,9 +145,6 @@ python export.py --task lightweight_sr --scale 2 --model_path model_zoo/swinir/0
 
 # Color Image Denoising
 python export.py --task color_dn --noise 15 --model_path model_zoo/swinir/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.pth --folder_gt testsets/McMaster
-
-# JPEG Compression Artifact Reduction
-python export.py --task jpeg_car --jpeg 10 --model_path model_zoo/swinir/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10.pth --folder_gt testsets/classic5
 ```
 
 **ONNX surgeon**
@@ -147,9 +157,6 @@ python surgeon.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweight
 
 # Color Image Denoising
 python surgeon.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.onnx
-
-# JPEG Compression Artifact Reduction
-python surgeon.py --onnxFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10.onnx --task jpeg_car
 ```
 
 **导出TensorRT模型**
@@ -162,9 +169,6 @@ python onnx2trt.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweigh
 
 # Color Image Denoising
 python onnx2trt.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15_surgeon.onnx --task color_dn
-
-# JPEG Compression Artifact Reduction
-python onnx2trt.py --onnxFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.onnx --task jpeg_car
 ```
 
 **测试TensorRT模型**(支持动态尺寸H/W)  
@@ -175,14 +179,8 @@ python testTRT.py --onnxFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_D
 # Lightweight Image Super-Resolution
 python testTRT.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.onnx --TRTFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.plan --task lightweight_sr --scale 2 --model_path model_zoo/swinir/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth --folder_lq testsets/Set5/LR_bicubic/X2 --folder_gt testsets/Set5/HR
 
-# Real-World Image Super-Resolution
-python testTRT.py --onnxFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.onnx --TRTFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.plan --task real_sr --scale 2 --model_path model_zoo/swinir/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN.pth --folder_lq testsets/RealSRSet+5images
-
 # Color Image Denoising
 python testTRT.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15_surgeon.onnx --TRTFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15_surgeon.plan --task color_dn --noise 15 --model_path model_zoo/swinir/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.pth --folder_gt testsets/McMaster
-
-# JPEG Compression Artifact Reduction
-python testTRT.py --onnxFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.onnx --TRTFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.plan --task jpeg_car --jpeg 10 --model_path model_zoo/swinir/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10.pthc --folder_gt testsets/classic5
 ```
 
 最后能得到一张类似下图的TRT-PyTorch模型结果对比表格
@@ -201,11 +199,6 @@ Lightweight Image Super-Resolution任务中,采用了两种分辨率的原模型
 #### Color Image Denoising
 Color Image Deoising任务中,采用了一种噪声程度的原模型进行测试,noise-15,模型均采用SwinIR官方仓库[release模型](https://github.com/JingyunLiang/SwinIR/releases),并在多个数据集上进行测试,数据集下载可见[SwinIR官方仓库](https://github.com/JingyunLiang/SwinIR),FP32模型和FP16模型的加速比如下图所示
 ![Deoising](./figs/color_deoising.png)  
-
-
-#### JPEG Compression Artifact Reduction
-JPEG Compression Artifact Reduction任务中,采用了一种噪声程度的原模型进行测试,jpeg-10,模型均采用SwinIR官方仓库[release模型](https://github.com/JingyunLiang/SwinIR/releases),并在多个数据集上进行测试,数据集下载可见[SwinIR官方仓库](https://github.com/JingyunLiang/SwinIR),FP32模型和FP16模型的加速比如下图所示
-![JPEG](./figs/JPEG.png)  
 ## Bug报告（可选）
 无
 

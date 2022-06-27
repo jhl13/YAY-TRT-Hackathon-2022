@@ -78,8 +78,7 @@ def surgeon(args):
         img_mask_shape = ShapeNode.outputs[0]
         WindowsMaskN = gs.Node("WindowsMask", "WindowsMask-" + str(nWindowsMask), 
                                     inputs=[img_mask, img_mask_shape], 
-                                    outputs=[ScatterNDNode.outputs[0]],
-                                    attrs={"window_size":window_size})
+                                    outputs=[ScatterNDNode.outputs[0]])
         graph.nodes.append(WindowsMaskN)
         nWindowsMask += 1
         ScatterNDNode.outputs = []
