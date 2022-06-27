@@ -2,7 +2,7 @@
 **队伍名称**：摇阿摇  
 **复赛优化模型**：[SwinIR-测试](https://github.com/JingyunLiang/SwinIR)  
 上述链接中只包含测试代码，如果需要训练代码，请查看[SwinIR-训练](https://github.com/cszn/KAIR/blob/master/docs/README_SwinIR.md)  
-在复赛过程中我们只对训练好的模型进行优化加速，所以只使用测试代码就足够了  
+在复赛过程中我们只对训练好的模型进行优化加速，所以只使用测试代码就足够了，本项目对SwinIR中的超分、去噪、JPEG压缩伪影去除三个任务分别进行了TensorRT模型转化  
 
 ## 原始模型
 ### 模型简介
@@ -31,12 +31,45 @@ SwinIR模型转换为ONNX模型后，产生大量算子的原因有两个：1、
 ![gather](./figs/gather.png) 
 
 ## 优化过程  
-
+#### 代码框架
+代码框架与SwinIR原仓库结构基本保持一致
+.
+├── figs  # README.md相关的图片
+|
+├── model_zoo  # SwinIR pth模型
+│    └── swinir
+|
+├── calib_train_image   # INT8量化的数据约30660张, 开源代码该部分内容被删除
+│   ├── A_57b26b46_2e1e_11eb_9d64_00d861c69d42.jpg
+│   ├── ... ...
+│   └── N9_50667548_2e21_11eb_ac9b_00d861c69d42.jpg
+|
+├── test   # 性能测试需要的测试图像约1000张，开源代码该部分内容被删除
+│   ├── test_c6d6ecec_2fd1_11eb_b773_00d861c69d42.jpg
+│   ├── ... ...
+│   └── test_d4c4ea34_2fd1_11eb_9f0e_00d861c69d42.jpg
+|
+├── checkpoint  # DETR Pytorch 模型，开源代码该部分仅提供模型下载链接
+│   ├── detr_resnet50.pth
+│   └── log.txt
+├── pic  # README 静态资源文件
+|
+├── detr_pth2onnx.py  # pytorch 转onnx支持static,dynamic shape, btached, onnx check, onnx-simplifier, onnx-graphsurgeon
+├── generate_batch_plan.py  # 生成batched static tensorrt 序列化engine文件，支持FP32,FP16,任意batch size
+├── inference_detr_onnx.py   # onnx runtime模型推断，支持static,dynamic shape,用于验证onnx的正确性
+├── inference_detr_trt.py   # tensorrt模型推断，支持，static,dynamic shape,FP32,FP16,INT8并检验engine是否存在，不存在调用序列化程序
+├── performance_accuracy_detr.py  # TensorRT识别精度的计算和可视化
+├── performance_time_detr.py      # TensorRT benchmark的计算和可视化
+├── trt_int8_quant.py  # INT8量化，并生成量化模型的engine和cache文件
+|
+├── requirements.txt   # Python package list
+├── LICENSE     
+└── README.md
 
 ## 测试流程
 **Docker**  
 建议使用[NGC](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tensorrt)  
-目前官方docker环境中配置的TensorRT版本为8.2.5.1，但本项目代码在TensorRT 8.2.5.1与TensorRT 8.4.1.5中均通过测试。
+本项目代码在TensorRT 8.2.5.1与TensorRT 8.4.1.5中均通过测试。
 
 **安装**  
 ```bash
@@ -126,7 +159,7 @@ python onnx2trt.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFW
 python onnx2trt.py --onnxFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.onnx --task jpeg_car
 ```
 
-**测试TensorRT模型**(支持动态尺寸)  
+**测试TensorRT模型**(支持动态尺寸H/W)  
 ```python
 # Classical Image Super-Resolution
 python testTRT.py --onnxFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_DF2K_s64w8_SwinIR-M_x2_surgeon.onnx --TRTFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_DF2K_s64w8_SwinIR-M_x2_surgeon.plan --task classical_sr --scale 2 --training_patch_size 64 --model_path model_zoo/swinir/001_classicalSR_DF2K_s64w8_SwinIR-M_x2.pth --folder_lq testsets/Set5/LR_bicubic/X2 --folder_gt testsets/Set5/HR
