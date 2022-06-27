@@ -33,32 +33,34 @@ __global__ void windowsMaskKernel(T *pInput, int *shape, T *pOutput, int nElemen
 
     int h = index / W;
     int w = index % W;
+
+    int window_size = 8;
     
-    if (h < (H - 8) && w < (W - 8)){
+    if (h < (H - window_size) && w < (W - window_size)){
         pOutput[index] = (T)0;
     }
-    else if (h < (H - 8) && w < (W - 4) && w >= (W - 8)){
+    else if (h < (H - window_size) && w < (W - window_size/2) && w >= (W - window_size)){
         pOutput[index] = (T)1;
     }
-    else if (h < (H - 8) && w >= (W - 4)){
+    else if (h < (H - window_size) && w >= (W - window_size)){
         pOutput[index] = (T)2;
     }
-    else if (h < (H - 4) && h >= (H - 8) && w < (W - 8)){
+    else if (h < (H - window_size/2) && h >= (H - window_size) && w < (W - window_size)){
         pOutput[index] = (T)3;
     }
-    else if (h < (H - 4) && h >= (H - 8) && w < (W - 4) && w >= (W - 8)){
+    else if (h < (H - window_size/2) && h >= (H - window_size) && w < (W - window_size/2) && w >= (W - window_size)){
         pOutput[index] = (T)4;
     }
-    else if (h < (H - 4) && h >= (H - 8) && w >= (W - 4)){
+    else if (h < (H - window_size/2) && h >= (H - window_size) && w >= (W - window_size/2)){
         pOutput[index] = (T)5;
     }
-    else if (h >= (H - 4) && w < (W - 8)){
+    else if (h >= (H - window_size/2) && w < (W - window_size)){
         pOutput[index] = (T)6;
     }
-    else if (h >= (H - 4) && w < (W - 4) && w >= (W - 8)){
+    else if (h >= (H - window_size/2) && w < (W - window_size/2) && w >= (W - window_size)){
         pOutput[index] = (T)7;
     }
-    else if (h >= (H - 4) && w >= (W - 4)){
+    else if (h >= (H - window_size/2) && w >= (W - window_size/2)){
         pOutput[index] = (T)8;
     }
 }
