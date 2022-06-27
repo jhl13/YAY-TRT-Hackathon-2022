@@ -32,9 +32,11 @@ SwinIR模型转换为ONNX模型后，产生大量算子的原因有两个：1、
 
 ## 优化过程  
 
+
+## 测试流程
 **Docker**  
 建议使用[NGC](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tensorrt)  
-目前官方docker环境中配置的TensorRT版本为8.2.4，但本项目代码在TensorRT 8.2.4与TensorRT 8.4.1.5中均通过测试。
+目前官方docker环境中配置的TensorRT版本为8.2.5.1，但本项目代码在TensorRT 8.2.5.1与TensorRT 8.4.1.5中均通过测试。
 
 **安装**  
 ```bash
@@ -142,8 +144,11 @@ python testTRT.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB
 python testTRT.py --onnxFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.onnx --TRTFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.plan --task jpeg_car --jpeg 10 --model_path model_zoo/swinir/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10.pthc --folder_gt testsets/classic5
 ```
 
+最后能得到一张类似下图的TRT-PyTorch模型结果对比表格
+![对比结果](./figs/对比结果.png) 
+
 ## 精度与加速效果
-下列测试结果均在A10 GPU,TensorRT 8.4.5.1中测试得到
+下列测试结果均在A10 GPU,TensorRT 8.4.1.5中测试得到
 #### Classical Image Super-Resolution
 Classical Image Super-Resolution任务中,采用了两种分辨率的原模型进行测试,分别是x2模型和x4模型,模型均采用SwinIR官方仓库[release模型](https://github.com/JingyunLiang/SwinIR/releases),并在多个数据集上进行测试,数据集下载可见[SwinIR官方仓库](https://github.com/JingyunLiang/SwinIR),FP32模型和FP16模型的加速比如下图所示
 ![Classical](./figs/classical_SR.png)  
@@ -158,7 +163,7 @@ Color Image Deoising任务中,采用了一种噪声程度的原模型进行测�
 
 
 #### JPEG Compression Artifact Reduction
-JPEG Compression Artifact Reduction任务中,采用了一种噪声程度的原模型进行测试,jpeg-15,模型均采用SwinIR官方仓库[release模型](https://github.com/JingyunLiang/SwinIR/releases),并在多个数据集上进行测试,数据集下载可见[SwinIR官方仓库](https://github.com/JingyunLiang/SwinIR),FP32模型和FP16模型的加速比如下图所示
+JPEG Compression Artifact Reduction任务中,采用了一种噪声程度的原模型进行测试,jpeg-10,模型均采用SwinIR官方仓库[release模型](https://github.com/JingyunLiang/SwinIR/releases),并在多个数据集上进行测试,数据集下载可见[SwinIR官方仓库](https://github.com/JingyunLiang/SwinIR),FP32模型和FP16模型的加速比如下图所示
 ![JPEG](./figs/JPEG.png)  
 ## Bug报告（可选）
 无

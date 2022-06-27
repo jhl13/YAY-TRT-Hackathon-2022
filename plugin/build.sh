@@ -8,7 +8,7 @@ make
 mv *.so ../
 cd ..
 
-cd LayerNorm
+cd LayerNormPlugin
 make
 mv *.so ../
 cd ..
@@ -18,12 +18,12 @@ make
 mv *.so ../
 cd ..
 
-cd STReshapeRoll
+cd STReshapeRollPlugin
 make
 mv *.so ../
 cd ..
 
-cd STReshapeAdd
+cd STReshapeAddPlugin
 make
 mv *.so ../
 cd ..
