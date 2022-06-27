@@ -22,7 +22,7 @@ PluginFieldCollection WindowsMaskPluginCreator::fc_{};
 std::vector<PluginField> WindowsMaskPluginCreator::attr_;
 
 template<typename T>
-__global__ void windowsMaskKernel(T *pInput, int *shape, T *pOutput, int nElement)
+__global__ void windowsMaskKernel(T *pInput, int *shape, T *pOutput, int nElement, int window_size)
 {
     const int index = blockIdx.x * 256 + threadIdx.x;
     if (index > nElement){
@@ -34,31 +34,31 @@ __global__ void windowsMaskKernel(T *pInput, int *shape, T *pOutput, int nElemen
     int h = index / W;
     int w = index % W;
     
-    if (h < (H - 8) && w < (W - 8)){
+    if (h < (H - window_size) && w < (W - window_size)){
         pOutput[index] = (T)0;
     }
-    else if (h < (H - 8) && w < (W - 4) && w >= (W - 8)){
+    else if (h < (H - window_size) && w < (W - window_size/2) && w >= (W - window_size)){
         pOutput[index] = (T)1;
     }
-    else if (h < (H - 8) && w >= (W - 4)){
+    else if (h < (H - window_size) && w >= (W - window_size/2)){
         pOutput[index] = (T)2;
     }
-    else if (h < (H - 4) && h >= (H - 8) && w < (W - 8)){
+    else if (h < (H - window_size/2) && h >= (H - window_size) && w < (W - window_size)){
         pOutput[index] = (T)3;
     }
-    else if (h < (H - 4) && h >= (H - 8) && w < (W - 4) && w >= (W - 8)){
+    else if (h < (H - window_size/2) && h >= (H - window_size) && w < (W - window_size/2) && w >= (W - window_size)){
         pOutput[index] = (T)4;
     }
-    else if (h < (H - 4) && h >= (H - 8) && w >= (W - 4)){
+    else if (h < (H - window_size/2) && h >= (H - window_size) && w >= (W - window_size/2)){
         pOutput[index] = (T)5;
     }
-    else if (h >= (H - 4) && w < (W - 8)){
+    else if (h >= (H - window_size/2) && w < (W - window_size)){
         pOutput[index] = (T)6;
     }
-    else if (h >= (H - 4) && w < (W - 4) && w >= (W - 8)){
+    else if (h >= (H - window_size/2) && w < (W - window_size/2) && w >= (W - window_size)){
         pOutput[index] = (T)7;
     }
-    else if (h >= (H - 4) && w >= (W - 4)){
+    else if (h >= (H - window_size/2) && w >= (W - window_size/2)){
         pOutput[index] = (T)8;
     }
 }
@@ -74,11 +74,11 @@ int32_t WindowsMaskPlugin::enqueue(const PluginTensorDesc* inputDesc, const Plug
     dim3 grid(CEIL_DIVIDE(nElement, 256), 1, 1), block(256, 1, 1); 
     switch (int(inputDesc[0].type)){
         case int(DataType::kFLOAT):{
-            windowsMaskKernel<float> <<<grid, block, 0, stream>>>((float *)inputs[0], (int *)inputs[1], (float *)outputs[0], nElement);
+            windowsMaskKernel<float> <<<grid, block, 0, stream>>>((float *)inputs[0], (int *)inputs[1], (float *)outputs[0], nElement, window_size_);
             break;
         }
         case int(DataType::kHALF):{
-            windowsMaskKernel<half> <<<grid, block, 0, stream>>>((half *)inputs[0], (int *)inputs[1], (half *)outputs[0], nElement);
+            windowsMaskKernel<half> <<<grid, block, 0, stream>>>((half *)inputs[0], (int *)inputs[1], (half *)outputs[0], nElement, window_size_);
             break;
         }
         default:

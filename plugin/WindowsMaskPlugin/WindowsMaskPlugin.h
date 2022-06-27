@@ -19,6 +19,7 @@
 #include <NvInfer.h>
 #include <cuda_fp16.h>
 
+// #define DEBUG 1
 // +------- Debug wrapper --------------------------------------------------------------------------
 #if DEBUG
 #define WHERE_AM_I() do {printf("[%s]: this=->%p\n",__func__,this);} while(0);
@@ -45,15 +46,19 @@ class WindowsMaskPlugin: public IPluginV2DynamicExt
 private:    
     std::string name_;
     std::string namespace_;
+    int window_size_;
+    
 
 public:
-    WindowsMaskPlugin(const std::string& name) : name_(name)
+    WindowsMaskPlugin(const std::string& name, int window_size) : name_(name)
     {
+        window_size_ = window_size;
         WHERE_AM_I();
     }
 
     WindowsMaskPlugin(const std::string& name, const void* data, size_t length) : name_(name)
     {
+        memcpy(&window_size_, data, sizeof(window_size_));
         WHERE_AM_I();
     }
     
@@ -72,13 +77,14 @@ public:
     
     void serialize(void *buffer) const noexcept override
     {
+        memcpy(buffer, &window_size_, sizeof(window_size_));
         WHERE_AM_I();
     }
   
     IPluginV2DynamicExt* clone() const noexcept override
     {
         WHERE_AM_I();
-        return new WindowsMaskPlugin(name_);
+        return new WindowsMaskPlugin(name_, window_size_);
     }
 
     int getNbOutputs() const noexcept override
@@ -182,6 +188,7 @@ private:
 public:
     WindowsMaskPluginCreator()
     {
+        attr_.emplace_back(PluginField("window_size", nullptr, PluginFieldType::kINT32, 1));
         fc_.nbFields = attr_.size();
         fc_.fields = attr_.data();
     }
@@ -190,8 +197,18 @@ public:
 
     IPluginV2* createPlugin(const char* name, const PluginFieldCollection* fc) noexcept override
     {
+        int window_size {8};
         WHERE_AM_I();
-        return new WindowsMaskPlugin(name);
+        for (int i = 0; i < fc->nbFields; i++)
+        {
+            std::string field_name(fc->fields[i].name);
+            if (field_name.compare("window_size") == 0)
+            {
+                window_size = *static_cast<const int *>(fc->fields[i].data);
+            }
+        }
+
+        return new WindowsMaskPlugin(name, window_size);
     }
 
     IPluginV2* deserializePlugin(const char* name, const void* serialData, size_t serialLength) noexcept override

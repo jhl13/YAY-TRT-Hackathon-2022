@@ -3,7 +3,11 @@ import onnx
 import onnx_graphsurgeon as gs
 import numpy as np
 
-def surgeon(onnx_path):
+def surgeon(args):
+    onnx_path = args.onnxFile
+    window_size = 8
+    if args.task == "jpeg_car":
+        window_size = 7
     # 读取 .onnx 并进行调整
     graph = gs.import_onnx(onnx.load(onnx_path))
 
@@ -72,7 +76,10 @@ def surgeon(onnx_path):
     if ConstantOfShapeNode is not None and ShapeNode is not None and ScatterNDNode is not None:
         img_mask = ConstantOfShapeNode.outputs[0]
         img_mask_shape = ShapeNode.outputs[0]
-        WindowsMaskN = gs.Node("WindowsMask", "WindowsMask-" + str(nWindowsMask), inputs=[img_mask, img_mask_shape], outputs=[ScatterNDNode.outputs[0]])
+        WindowsMaskN = gs.Node("WindowsMask", "WindowsMask-" + str(nWindowsMask), 
+                                    inputs=[img_mask, img_mask_shape], 
+                                    outputs=[ScatterNDNode.outputs[0]],
+                                    attrs={"window_size":window_size})
         graph.nodes.append(WindowsMaskN)
         nWindowsMask += 1
         ScatterNDNode.outputs = []
@@ -87,7 +94,7 @@ def surgeon(onnx_path):
             STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
                                     inputs=[reshapeN.inputs[0], ConvNode.outputs[0]], 
                                     outputs=[LastN.outputs[0]],
-                                    attrs={"type":0, "window_size":8, "num_heads":6})
+                                    attrs={"type":0, "window_size":window_size, "num_heads":6})
             graph.nodes.append(STReshapeN)
             nSTReshape += 1
             LastN.outputs = []
@@ -100,7 +107,7 @@ def surgeon(onnx_path):
         #     STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
         #                             inputs=[reshapeN.inputs[0], FirstLayerNormNode.outputs[0]], 
         #                             outputs=[LastN.outputs[0]],
-        #                             attrs={"type":1, "window_size":8, "num_heads":6})
+        #                             attrs={"type":1, "window_size":window_size, "num_heads":6})
         #     graph.nodes.append(STReshapeN)
         #     nSTReshape += 1
         #     LastN.outputs = []
@@ -115,7 +122,7 @@ def surgeon(onnx_path):
             STReshapeRollN = gs.Node("STReshapeRoll", "STReshapeRoll-" + str(nSTReshapeRoll), 
                                     inputs=[reshapeN.inputs[0], ConvNode.outputs[0]], 
                                     outputs=[LastN.outputs[0]],
-                                    attrs={"type":0, "window_size":8, "shift": -4})
+                                    attrs={"type":0, "window_size":window_size, "shift": -4})
             graph.nodes.append(STReshapeRollN)
             nSTReshapeRoll += 1
             LastN.outputs = []
@@ -130,7 +137,7 @@ def surgeon(onnx_path):
             STReshapeRollN = gs.Node("STReshapeRoll", "STReshapeRoll-" + str(nSTReshapeRoll), 
                                     inputs=[reshapeN.inputs[0], FirstLayerNormNode.outputs[0]], 
                                     outputs=[LastN.outputs[0]],
-                                    attrs={"type":1, "window_size":8, "shift": 4})
+                                    attrs={"type":1, "window_size":window_size, "shift": 4})
             graph.nodes.append(STReshapeRollN)
             nSTReshapeRoll += 1
             LastN.outputs = []
@@ -146,7 +153,7 @@ def surgeon(onnx_path):
         #     STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
         #                             inputs=[FirstN.inputs[0], FirstLayerNormNode.outputs[0]], 
         #                             outputs=[LastN.outputs[0]],
-        #                             attrs={"type":2, "window_size":8, "num_heads":6})
+        #                             attrs={"type":2, "window_size":window_size, "num_heads":6})
         #     graph.nodes.append(STReshapeN)
         #     nSTReshape += 1
         #     LastN.outputs = []
@@ -158,7 +165,7 @@ def surgeon(onnx_path):
             STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
                                     inputs=[FirstN.inputs[0], ConvNode.outputs[0]], 
                                     outputs=[LastN.outputs[0]],
-                                    attrs={"type":3, "window_size":8, "num_heads":6})
+                                    attrs={"type":3, "window_size":window_size, "num_heads":6})
             graph.nodes.append(STReshapeN)
             nSTReshape += 1
             LastN.outputs = []
@@ -169,7 +176,7 @@ def surgeon(onnx_path):
             STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
                                     inputs=[node.inputs[0], ConvNode.outputs[0]], 
                                     outputs=[node.outputs[0]],
-                                    attrs={"type":4, "window_size":8, "num_heads":6})
+                                    attrs={"type":4, "window_size":window_size, "num_heads":6})
             graph.nodes.append(STReshapeN)
             nSTReshape += 1
             node.outputs = []
@@ -194,7 +201,7 @@ def surgeon(onnx_path):
         #     STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
         #                             inputs=[reshapeNode.inputs[0], FirstSTReshapeNode.outputs[0]], 
         #                             outputs=[reshapeNode.outputs[0]],
-        #                             attrs={"type":5, "num_heads":6, "window_size":8})
+        #                             attrs={"type":5, "num_heads":6, "window_size":window_size})
         #     graph.nodes.append(STReshapeN)
         #     nSTReshape += 1
         #     reshapeNode.outputs = []
@@ -205,7 +212,7 @@ def surgeon(onnx_path):
         #     STReshapeN = gs.Node("STReshape", "STReshape-" + str(nSTReshape), 
         #                             inputs=[reshapeNode.inputs[0], FirstSTReshapeNode.outputs[0]], 
         #                             outputs=[reshapeNode.outputs[0]],
-        #                             attrs={"type":6, "num_heads":6, "window_size":8})
+        #                             attrs={"type":6, "num_heads":6, "window_size":window_size})
         #     graph.nodes.append(STReshapeN)
         #     nSTReshape += 1
         #     reshapeNode.outputs = []
@@ -220,7 +227,7 @@ def surgeon(onnx_path):
             STReshapeAddN = gs.Node("STReshapeAdd", "STReshapeAdd-" + str(nSTReshapeAdd), 
                                     inputs=[positionNode.inputs[0], positionNode.inputs[1], maskNode.inputs[1]], 
                                     outputs=[LastNode.outputs[0]],
-                                    attrs={"type":6, "num_heads":6, "window_size": 8})
+                                    attrs={"type":6, "num_heads":6, "window_size": window_size})
             graph.nodes.append(STReshapeAddN)
             nSTReshapeAdd += 1
             LastNode.outputs = []
@@ -265,5 +272,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--onnxFile", type=str, default="./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.onnx",
                         help="onnx file path.")
+    parser.add_argument("--task", type=str, default=None)
     args = parser.parse_args()
-    surgeon(args.onnxFile)
+    surgeon(args)
