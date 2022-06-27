@@ -66,8 +66,19 @@ SwinIR模型转换为ONNX模型后，产生大量算子的原因有两个：1、
 原代码模型存在大量的冗余计算，如window mask的计算会在每个block中重复计算，而这些block的window mask是一样的，将这些window mask计算提前，并且以参数形式传入每个block中，可以大量减少onnx模型的节点数量，且可以提升模型的速度。如16.4MB的002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth模型导出ONNX后，ONNX包含了29308个节点。经过改进后的PyTorch模型只有6178个节点，节点数只有原来的21%。速度上也有所提升，可见[精度与加速效果](#精度与加速效果)
 
 **shape相关节点的优化**  
+在测试过程中，转化TRT模型时会出现以下报错  
+![menSize](./figs/memSize.png)  
+后续我们发现原因是因为H\W是动态的，导致Reshape算子不能正常根据输入形状reshape tensorrt。我们的做法是将所有动态reshape的算子都换成plugin实现，plugin进行reshape的方法是，根据输入的形状进行reshape，这样可以避免显式获取tensor shape进行reshape的情况。涉及到的plugin为./plugin中的STReshapeAddPlugin、STReshapePlugin、STReshapeRollPlugin。最终我们可以实现surgeon后的模型不再存在显式获取tensor shape的操作。  
+![getoutputdimensions](./figs/getoutputdimensions.png)  
+上述为reshape相关plugin算子中的getOutputDimensions函数，其中input[1]是一个参考tensor，其并不参与真实的计算，只用来计算output tensor的shape。使用surgeon.py文件可以  
+
+**Window mask 优化**  
+
+**Gather 优化**  
 
 **Nsight Systems 优化**  
+使用Nsight System进行可视化后，发现有个占总耗时6%左右的scale算子，其是在Reshape相关的plugin周围的算子，而且是较为简单的Add节点，我们进一步将这部分的节点融进plugin中，减少Kernel调用的时间。
+![nsight](./figs/nsight.png)  
 
 **FP16模式 优化**  
 

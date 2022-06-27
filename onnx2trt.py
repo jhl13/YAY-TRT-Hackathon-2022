@@ -26,7 +26,7 @@ def onnx2trt():
     PluginPath   = "./plugin/"
     soFileList = glob(PluginPath + "*.so")
     print(soFileList)
-    logger = trt.Logger(trt.Logger.VERBOSE)
+    logger = trt.Logger(trt.Logger.WARNING)
     trt.init_libnvinfer_plugins(logger, '')
     for soFile in soFileList:
         ctypes.cdll.LoadLibrary(soFile)
