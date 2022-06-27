@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-
+import numpy as np
 
 class Mlp(nn.Module):
     def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
@@ -30,7 +30,7 @@ class Mlp(nn.Module):
         return x
 
 
-def window_partition(x, window_size):
+def window_partition(x, window_size, C_=1):
     """
     Args:
         x: (B, H, W, C)
@@ -41,7 +41,7 @@ def window_partition(x, window_size):
     """
     B, H, W, C = x.shape
     x = x.view(B, H // window_size, window_size, W // window_size, window_size, C)
-    windows = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(-1, window_size, window_size, C)
+    windows = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(-1, window_size, window_size, C_)
     return windows
 
 
@@ -131,9 +131,10 @@ class WindowAttention(nn.Module):
 
         if mask is not None:
             nW = mask.shape[0]
+            # attn shape:[1, B_, 6, N, N], mask shape:[1, B_, 1, N, N]
             attn = attn.view(B_ // mask.shape[0], mask.shape[0], self.num_heads, N, N) + mask.unsqueeze(1).unsqueeze(0)
             attn = attn.view(-1, self.num_heads, N, N)
-            attn = self.softmax(attn)
+            attn = self.softmax(attn)  # 很耗时
         else:
             attn = self.softmax(attn)
 
@@ -244,7 +245,6 @@ class SwinTransformerBlock(nn.Module):
         shortcut = x
         x = self.norm1(x)
         x = x.view(B, H, W, C)
-
         # cyclic shift
         if self.shift_size > 0:
             shifted_x = torch.roll(x, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))
@@ -252,15 +252,16 @@ class SwinTransformerBlock(nn.Module):
             shifted_x = x
 
         # partition windows
-        x_windows = window_partition(shifted_x, self.window_size)  # nW*B, window_size, window_size, C
+        x_windows = window_partition(shifted_x, self.window_size, C)  # nW*B, window_size, window_size, C
         x_windows = x_windows.view(-1, self.window_size * self.window_size, C)  # nW*B, window_size*window_size, C
 
         attn_windows = self.attn(x_windows, mask=mask)
+        # attn_windows = x_windows
 
         # merge windows
         attn_windows = attn_windows.view(-1, self.window_size, self.window_size, C)
         shifted_x = window_reverse(attn_windows, self.window_size, H, W)  # B H' W' C
-
+        
         # reverse cyclic shift
         if self.shift_size > 0:
             x = torch.roll(shifted_x, shifts=(self.shift_size, self.shift_size), dims=(1, 2))
@@ -393,13 +394,13 @@ class BasicLayer(nn.Module):
             self.downsample = None
 
     def forward(self, x, x_size, mask, mask_shift):
-        for i in range(self.depth):
+        for i in range(self.depth): # x_windows
             blk = self.blocks[i]
             if self.use_checkpoint:
                 x = checkpoint.checkpoint(blk, x, x_size)
             else:
                 if i % 2 == 0:
-                    x = blk(x, x_size, mask)
+                    x = blk(x, x_size)
                 else:
                     x = blk(x, x_size, mask_shift)
         if self.downsample is not None:
@@ -663,6 +664,7 @@ class SwinIR(nn.Module):
             self.mean = torch.Tensor(rgb_mean).view(1, 3, 1, 1)
         else:
             self.mean = torch.zeros(1, 1, 1, 1)
+            # self.mean = torch.zeros(1)
         self.upscale = upscale
         self.upsampler = upsampler
         self.window_size = window_size
@@ -812,8 +814,7 @@ class SwinIR(nn.Module):
         mask_windows = window_partition(img_mask, self.window_size)  # nW, window_size, window_size, 1
         mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
         attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
-        attn_mask = attn_mask.masked_fill(attn_mask != 0, float(-100.0)).masked_fill(attn_mask == 0, float(0.0))
-
+        attn_mask = attn_mask.masked_fill(attn_mask != 0, float(-100.0)) # .masked_fill(attn_mask == 0, float(0.0))
         return attn_mask
 
     def forward_features(self, x):
@@ -831,7 +832,6 @@ class SwinIR(nn.Module):
 
         x = self.norm(x)  # B L C
         x = self.patch_unembed(x, x_size)
-
         return x
 
     def forward(self, x):
@@ -841,12 +841,18 @@ class SwinIR(nn.Module):
         w_pad = (w_old // self.window_size + 1) * self.window_size - w_old
         x = torch.cat([x, torch.flip(x, [2])], 2)[:, :, :h_old + h_pad, :]
         x = torch.cat([x, torch.flip(x, [3])], 3)[:, :, :, :w_old + w_pad]
-
         H, W = x.shape[2:]
-        # x = self.check_image_size(x)
-        self.mean = self.mean.type_as(x)
-        x = (x - self.mean) * self.img_range
 
+        # x = self.check_image_size(x)
+        if self.mean.max() > 0:
+            self.mean = self.mean.type_as(x)
+            x = (x - self.mean) * self.img_range
+        else:
+            self.mean = self.mean.type_as(x)
+            x = x * self.img_range
+        # print(self.mean)
+        # print(self.img_range)
+        # return x
         if self.upsampler == 'pixelshuffle':
             # for classical SR
             x = self.conv_first(x)
@@ -874,7 +880,6 @@ class SwinIR(nn.Module):
             x = x + self.conv_last(res)
 
         x = x / self.img_range + self.mean
-
         return x[:, :, :H*self.upscale, :W*self.upscale]
 
     def flops(self):

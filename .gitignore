@@ -3,3 +3,8 @@
 *.plan
 *.pyc
 results
+*.so
+*.d
+*.npz
+.vscode
+*.nsys-rep
