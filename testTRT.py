@@ -13,6 +13,8 @@ from cuda import cudart
 import tensorrt as trt
 from collections import OrderedDict
 import cv2
+from main_test_swinir import setup, get_image_pair
+from pathlib import Path
 
 def reorder_image(img, input_order='HWC'):
     """Reorder images to 'HWC' order.
@@ -282,32 +284,39 @@ def testTRT():
                         help="onnx file path.")
     parser.add_argument("--TRTFile", type=str, default="./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.plan",
                         help="onnx file path.")
+    
+    parser.add_argument('--task', type=str, default='classical_sr', help='classical_sr, lightweight_sr, real_sr, '
+                                                                     'gray_dn, color_dn, jpeg_car')
+    parser.add_argument('--scale', type=int, default=1, help='scale factor: 1, 2, 3, 4, 8') # 1 for dn and jpeg car
+    parser.add_argument('--noise', type=int, default=15, help='noise level: 15, 25, 50')
+    parser.add_argument('--jpeg', type=int, default=40, help='scale factor: 10, 20, 30, 40')
+    parser.add_argument('--training_patch_size', type=int, default=48, help='patch size used in training SwinIR. '
+                                       'Just used to differentiate two different settings in Table 2 of the paper. '
+                                       'Images are NOT tested patch by patch.')
+    parser.add_argument('--large_model', action='store_true', help='use large model, only provided for real image sr')
+    parser.add_argument('--model_path', type=str,
+                        default='model_zoo/swinir/001_classicalSR_DIV2K_s48w8_SwinIR-M_x2.pth')
+    parser.add_argument('--folder_lq', type=str, default='testsets/Set5/LR_bicubic/X2', help='input low-quality test image folder')
+    parser.add_argument('--folder_gt', type=str, default='testsets/Set5/HR', help='input ground-truth test image folder')
+    parser.add_argument('--tile', type=int, default=None, help='Tile size, None for no tile during testing (testing as a whole)')
+    parser.add_argument('--tile_overlap', type=int, default=32, help='Overlapping of different tiles')
+
     args = parser.parse_args()
 
     if args.onnxFile is not None:
         graph = gs.import_onnx(onnx.load(args.onnxFile))
         print("graph nodes: ", len(graph.nodes))
 
-    folder_lq = "testsets/Set5/LR_bicubic/X2"
-    folder_gt = "testsets/Set5/HR"
+    folder_lq = args.folder_lq
+    folder_gt = args.folder_gt
     plan_file = args.TRTFile
     plugin_path = "plugin/"
     soFileList = glob(plugin_path + "*.so")
-    task = "lightweight_sr"
-    scale = 2
-    window_size = 8
-    border = 2
-
-    def get_image_pair(task, path):
-        (imgname, imgext) = os.path.splitext(os.path.basename(path))
-
-        # 001 classical image sr/ 002 lightweight image sr (load lq-gt image pairs)
-        if task in ["classical_sr", "lightweight_sr"]:
-            img_gt = cv2.imread(path, cv2.IMREAD_COLOR).astype(np.float32) / 255.
-            img_lq = cv2.imread(f"{folder_lq}/{imgname}x{scale}{imgext}", cv2.IMREAD_COLOR).astype(
-                np.float32) / 255.
-        return imgname, img_lq, img_gt
-    #-------------------------------------------------------------------------------
+    task = args.task
+    scale = args.scale
+    # window_size = 8
+    # border = 2
+    _, _, border, window_size = setup(args)
 
     logger = trt.Logger(trt.Logger.ERROR)
     trt.init_libnvinfer_plugins(logger, '')
@@ -348,12 +357,16 @@ def testTRT():
 
     tmp_list = sorted(glob(os.path.join(folder_gt, '*')))
     img_list = []
+    suffix = None
     for img_path in tmp_list:
         if img_path[-3:] != "npz":
             img_list.append(img_path)
+            if suffix is None:
+                suffix = Path(img_path).suffix
 
     for idx, path in enumerate(img_list):
-        imgname, img_lq, img_gt = get_image_pair(task, path)  # image to HWC-BGR, float32
+        print(path, task)
+        imgname, img_lq, img_gt = get_image_pair(args, path)  # image to HWC-BGR, float32
         img_lq = np.transpose(img_lq if img_lq.shape[2] == 1 else img_lq[:, :, [2, 1, 0]], (2, 0, 1))  # HCW-BGR to CHW-RGB
         img_lq = img_lq[np.newaxis, :, :, :]
 
@@ -385,15 +398,15 @@ def testTRT():
             cudart.cudaMemcpy(bufferH[i].ctypes.data, bufferD[i], bufferH[i].nbytes, cudart.cudaMemcpyKind.cudaMemcpyDeviceToHost)
 
         # warm up
-        for i in range(10):
+        for i in range(1):
             context.execute_v2(bufferD)
 
         # test infernece time
         t0 = time_ns()
-        for i in range(30):
+        for i in range(2):
             context.execute_v2(bufferD)
         t1 = time_ns()
-        timePerInference = (t1-t0)/1000/1000/30
+        timePerInference = (t1-t0)/1000/1000/2
 
         index_output = engine.get_binding_index("outputs")
         output = bufferH[index_output]
@@ -424,7 +437,7 @@ def testTRT():
         else:
             print('Testing {:d} {:20s}'.format(idx, imgname))
 
-        gt_data = np.load(path.replace(".png", ".npz"))
+        gt_data = np.load(path.replace(suffix, ".npz"))
         gt_output = gt_data["output"]
         check_res = check(np.asarray(output, dtype=np.float), np.asarray(gt_output, dtype=np.float), True)
         string = "%4d,%4d,%8.3f,%9.3e,%9.3e"%(h_old, w_old, timePerInference, check_res[1], check_res[2])

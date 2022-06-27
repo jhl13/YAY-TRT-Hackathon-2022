@@ -10,7 +10,7 @@ from time import time_ns
 
 from models.network_swinir import SwinIR as net
 from utils import util_calculate_psnr_ssim as util
-
+from pathlib import Path
 
 def main():
     parser = argparse.ArgumentParser()
@@ -60,9 +60,12 @@ def main():
 
     tmp_list = sorted(glob.glob(os.path.join(folder, '*')))
     img_list = []
+    suffix = None
     for img_path in tmp_list:
         if img_path[-3:] != "npz":
             img_list.append(img_path)
+            if suffix is None:
+                suffix = Path(img_path).suffix
 
     for idx, path in enumerate(img_list):
         # read image
@@ -123,7 +126,7 @@ def main():
         else:
             print('Testing {:d} {:20s}'.format(idx, imgname))
 
-        save_npz_file = path.replace(".png", ".npz")
+        save_npz_file = path.replace(suffix, ".npz")
         np.savez(save_npz_file, output=output, psnr=psnr, ssim=ssim, psnr_y=psnr_y, ssim_y=ssim_y, psnr_b=psnr_b, timePerInference=timePerInference)
 
     # summarize psnr/ssim

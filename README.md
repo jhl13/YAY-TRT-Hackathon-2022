@@ -95,6 +95,9 @@ python surgeon.py --onnxFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_D
 
 # Lightweight Image Super-Resolution
 python surgeon.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.onnx
+
+# Color Image Deoising
+python surgeon.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.onnx
 ```
 
 **导出TensorRT模型**
@@ -104,15 +107,21 @@ python onnx2trt.py --onnxFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_
 
 # Lightweight Image Super-Resolution
 python onnx2trt.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.onnx
+
+# Color Image Deoising
+python onnx2trt.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15_surgeon.onnx
 ```
 
 **测试TensorRT模型**(支持动态尺寸)  
 ```python
 # Classical Image Super-Resolution
-python testTRT.py --onnxFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_DF2K_s64w8_SwinIR-M_x2 --TRTFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.plan
+python testTRT.py --onnxFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_DF2K_s64w8_SwinIR-M_x2_surgeon.onnx --TRTFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_DF2K_s64w8_SwinIR-M_x2_surgeon.plan --task classical_sr --scale 2 --training_patch_size 64 --model_path model_zoo/swinir/001_classicalSR_DF2K_s64w8_SwinIR-M_x2.pth --folder_lq testsets/Set5/LR_bicubic/X2 --folder_gt testsets/Set5/HR
 
 # Lightweight Image Super-Resolution
-python testTRT.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.onnx --TRTFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.plan
+python testTRT.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.onnx --TRTFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.plan --task lightweight_sr --scale 2 --model_path model_zoo/swinir/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth --folder_lq testsets/Set5/LR_bicubic/X2 --folder_gt testsets/Set5/HR
+
+# Color Image Deoising
+python testTRT.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15_surgeon.onnx --TRTFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15_surgeon.plan --task color_dn --noise 15 --model_path model_zoo/swinir/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.pth --folder_gt testsets/McMaster
 ```
 
 

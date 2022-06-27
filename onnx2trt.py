@@ -40,14 +40,15 @@ def onnx2trt():
         print(f"Input{i} name: ", network.get_input(i).name)
     inputTensor1 = network.get_input(0)
 
-    profile.set_shape(inputTensor1.name, [1, 3, 114, 114], [1, 3, 256, 256], [1, 3, 512, 512])
+    # profile.set_shape(inputTensor1.name, [1, 3, 63, 57], [1, 3, 256, 256], [1, 3, 384, 324])
+    profile.set_shape(inputTensor1.name, [1, 3, 321, 321], [1, 3, 500, 500], [1, 3, 500, 500])
     config.add_optimization_profile(profile)
 
     config.profiling_verbosity = trt.ProfilingVerbosity.VERBOSE
     config.set_timing_cache(config.create_timing_cache(b""), ignore_mismatch=False)
-    config.set_flag(trt.BuilderFlag.FP16)
-    config.set_flag(trt.BuilderFlag.OBEY_PRECISION_CONSTRAINTS)
-    config.clear_flag(trt.BuilderFlag.TF32)
+    # config.set_flag(trt.BuilderFlag.FP16)
+    # config.set_flag(trt.BuilderFlag.OBEY_PRECISION_CONSTRAINTS)
+    # config.clear_flag(trt.BuilderFlag.TF32)
 
     engineString = builder.build_serialized_network(network, config)
 
