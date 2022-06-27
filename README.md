@@ -32,6 +32,7 @@ SwinIR模型转换为ONNX模型后，产生大量算子的原因有两个：1、
 
 ## 优化过程  
 **代码框架**
+```shell
 代码框架与SwinIR原仓库结构基本保持一致
 .
 ├── figs          # README.md相关的图片
@@ -59,6 +60,8 @@ SwinIR模型转换为ONNX模型后，产生大量算子的原因有两个：1、
 ├── surgeon.py    # 用于ONNX surgeon
 ├── testTRT.py    # 用于TRT模型
 └── README.md
+```
+
 
 ## 测试流程
 **Docker**  
