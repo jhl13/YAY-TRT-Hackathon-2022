@@ -664,6 +664,7 @@ class SwinIR(nn.Module):
             self.mean = torch.Tensor(rgb_mean).view(1, 3, 1, 1)
         else:
             self.mean = torch.zeros(1, 1, 1, 1)
+            # self.mean = torch.zeros(1)
         self.upscale = upscale
         self.upsampler = upsampler
         self.window_size = window_size
@@ -841,10 +842,17 @@ class SwinIR(nn.Module):
         x = torch.cat([x, torch.flip(x, [2])], 2)[:, :, :h_old + h_pad, :]
         x = torch.cat([x, torch.flip(x, [3])], 3)[:, :, :, :w_old + w_pad]
         H, W = x.shape[2:]
-        # x = self.check_image_size(x)
-        self.mean = self.mean.type_as(x)
-        x = (x - self.mean) * self.img_range
 
+        # x = self.check_image_size(x)
+        if self.mean.max() > 0:
+            self.mean = self.mean.type_as(x)
+            x = (x - self.mean) * self.img_range
+        else:
+            self.mean = self.mean.type_as(x)
+            x = x * self.img_range
+        # print(self.mean)
+        # print(self.img_range)
+        # return x
         if self.upsampler == 'pixelshuffle':
             # for classical SR
             x = self.conv_first(x)

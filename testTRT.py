@@ -15,6 +15,7 @@ from collections import OrderedDict
 import cv2
 from main_test_swinir import setup, get_image_pair
 from pathlib import Path
+from utils import util_calculate_psnr_ssim as util
 
 def reorder_image(img, input_order='HWC'):
     """Reorder images to 'HWC' order.
@@ -434,6 +435,9 @@ def testTRT():
                 ssim_y = calculate_ssim(output, img_gt, crop_border=border, test_y_channel=True)
                 test_results['psnr_y'].append(psnr_y)
                 test_results['ssim_y'].append(ssim_y)
+            if args.task in ['jpeg_car']:
+                psnr_b = util.calculate_psnrb(output, img_gt, crop_border=border, test_y_channel=True)
+                test_results['psnr_b'].append(psnr_b)
         else:
             print('Testing {:d} {:20s}'.format(idx, imgname))
 

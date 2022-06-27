@@ -22,7 +22,7 @@ def onnx2trt():
     PluginPath   = "./plugin/"
     soFileList = glob(PluginPath + "*.so")
     print(soFileList)
-    logger = trt.Logger(trt.Logger.WARNING)
+    logger = trt.Logger(trt.Logger.VERBOSE)
     trt.init_libnvinfer_plugins(logger, '')
     for soFile in soFileList:
         ctypes.cdll.LoadLibrary(soFile)
@@ -42,7 +42,7 @@ def onnx2trt():
 
     # profile.set_shape(inputTensor1.name, [1, 3, 63, 57], [1, 3, 256, 256], [1, 3, 256, 256])
     # profile.set_shape(inputTensor1.name, [1, 3, 321, 321], [1, 3, 500, 500], [1, 3, 500, 500])
-    profile.set_shape(inputTensor1.name, [1, 1, 480, 438], [1, 1, 512, 512], [1, 1, 768, 720])
+    profile.set_shape(inputTensor1.name, [1, 1, 469, 434], [1, 1, 518, 518], [1, 1, 770, 721])
     config.add_optimization_profile(profile)
 
     config.profiling_verbosity = trt.ProfilingVerbosity.VERBOSE
