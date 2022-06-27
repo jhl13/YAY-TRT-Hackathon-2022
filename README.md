@@ -91,7 +91,7 @@ gather操作对应的是代码中得到q、k、v的操作，直接转TRT模型�
 **Nsight Systems 优化**  
 使用Nsight System进行可视化后，发现有个占总耗时6%左右的scale算子，其是在Reshape相关的plugin周围的算子，而且是较为简单的Add节点，我们进一步将这部分的节点融进plugin中，减少Kernel调用的时间。
 ![nsight](./figs/nsight.png)  
-将这些节点合并入plugin后，再使用Nsight System进行可视化，可以看到运行时间由121ms下降到了179ms。且scale节点已不存在。
+将这些节点合并入plugin后，再使用Nsight System进行可视化，可以看到运行时间由121ms下降到了117ms。且scale节点已不存在。
 ![nsight2](./figs/nsight2.png)  
 
 **FP16模式 优化**  
