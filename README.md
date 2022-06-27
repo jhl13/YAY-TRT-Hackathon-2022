@@ -96,6 +96,9 @@ python surgeon.py --onnxFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_D
 # Lightweight Image Super-Resolution
 python surgeon.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.onnx
 
+# Real-World Image Super-Resolution
+python surgeon.py --onnxFile ./onnx_zoo/swinir_real_sr_x2/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN.onnx
+
 # Color Image Deoising
 python surgeon.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.onnx
 
@@ -111,6 +114,9 @@ python onnx2trt.py --onnxFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_
 # Lightweight Image Super-Resolution
 python onnx2trt.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.onnx
 
+# Real-World Image Super-Resolution
+python onnx2trt.py --onnxFile ./onnx_zoo/swinir_real_sr_x2/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN_surgeon.onnx
+
 # Color Image Deoising
 python onnx2trt.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15_surgeon.onnx
 
@@ -125,6 +131,9 @@ python testTRT.py --onnxFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_D
 
 # Lightweight Image Super-Resolution
 python testTRT.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.onnx --TRTFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.plan --task lightweight_sr --scale 2 --model_path model_zoo/swinir/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth --folder_lq testsets/Set5/LR_bicubic/X2 --folder_gt testsets/Set5/HR
+
+# Real-World Image Super-Resolution
+python testTRT.py --onnxFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.onnx --TRTFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.plan --task real_sr --scale 2 --model_path model_zoo/swinir/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN.pth --folder_lq testsets/RealSRSet+5images
 
 # Color Image Deoising
 python testTRT.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15_surgeon.onnx --TRTFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15_surgeon.plan --task color_dn --noise 15 --model_path model_zoo/swinir/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.pth --folder_gt testsets/McMaster

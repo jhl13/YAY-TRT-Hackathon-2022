@@ -40,9 +40,10 @@ def onnx2trt():
         print(f"Input{i} name: ", network.get_input(i).name)
     inputTensor1 = network.get_input(0)
 
-    # profile.set_shape(inputTensor1.name, [1, 3, 63, 57], [1, 3, 256, 256], [1, 3, 256, 256])
-    # profile.set_shape(inputTensor1.name, [1, 3, 321, 321], [1, 3, 500, 500], [1, 3, 500, 500])
-    profile.set_shape(inputTensor1.name, [1, 1, 469, 434], [1, 1, 518, 518], [1, 1, 770, 721])
+    # profile.set_shape(inputTensor1.name, [1, 3, 63, 57], [1, 3, 256, 256], [1, 3, 256, 256]) # SR
+    profile.set_shape(inputTensor1.name, [1, 3, 120, 120], [1, 3, 640, 512], [1, 3, 640, 512]) # Real SR
+    # profile.set_shape(inputTensor1.name, [1, 3, 321, 321], [1, 3, 500, 500], [1, 3, 500, 500]) # Denoising
+    # profile.set_shape(inputTensor1.name, [1, 1, 469, 434], [1, 1, 518, 518], [1, 1, 770, 721]) # JPEG Compression
     config.add_optimization_profile(profile)
 
     config.profiling_verbosity = trt.ProfilingVerbosity.VERBOSE
