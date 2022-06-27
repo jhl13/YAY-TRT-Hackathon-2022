@@ -62,6 +62,14 @@ SwinIR模型转换为ONNX模型后，产生大量算子的原因有两个：1、
 └── README.md
 ```
 
+**原PyTorch模型优化**  
+原代码模型存在大量的冗余计算，如window mask的计算会在每个block中重复计算，而这些block的window mask是一样的，将这些window mask计算提前，并且以参数形式传入每个block中，可以大量减少onnx模型的节点数量，且可以提升模型的速度。如16.4MB的002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth模型导出ONNX后，ONNX包含了29308个节点。经过改进后的PyTorch模型只有6178个节点，节点数只有原来的21%。速度上也有所提升，可见[精度与加速效果](#精度与加速效果)
+
+**shape相关节点的优化**  
+
+**Nsight Systems 优化**  
+
+**FP16模式 优化**  
 
 ## 测试流程
 **Docker**  
@@ -96,9 +104,6 @@ python main_test_swinir.py --task classical_sr --scale 2 --training_patch_size 6
 # Lightweight Image Super-Resolution
 python main_test_swinir.py --task lightweight_sr --scale 2 --model_path model_zoo/swinir/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth --folder_lq testsets/Set5/LR_bicubic/X2 --folder_gt testsets/Set5/HR
 
-# Real-World Image Super-Resolution
-python main_test_swinir.py --task real_sr --scale 2 --model_path model_zoo/swinir/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN.pth --folder_lq testsets/RealSRSet+5images
-
 # Color Image Denoising
 python main_test_swinir.py --task color_dn --noise 15 --model_path model_zoo/swinir/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.pth --folder_gt testsets/McMaster
 
@@ -113,9 +118,6 @@ python export.py --task classical_sr --scale 2 --training_patch_size 64 --model_
 
 # Lightweight Image Super-Resolution
 python export.py --task lightweight_sr --scale 2 --model_path model_zoo/swinir/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.pth --folder_lq testsets/Set5/LR_bicubic/X2 --folder_gt testsets/Set5/HR
-
-# Real-World Image Super-Resolution
-python export.py --task real_sr --scale 2 --model_path model_zoo/swinir/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN.pth --folder_lq testsets/RealSRSet+5images
 
 # Color Image Denoising
 python export.py --task color_dn --noise 15 --model_path model_zoo/swinir/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.pth --folder_gt testsets/McMaster
@@ -132,9 +134,6 @@ python surgeon.py --onnxFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_D
 # Lightweight Image Super-Resolution
 python surgeon.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2.onnx
 
-# Real-World Image Super-Resolution
-python surgeon.py --onnxFile ./onnx_zoo/swinir_real_sr_x2/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN.onnx
-
 # Color Image Denoising
 python surgeon.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.onnx
 
@@ -149,9 +148,6 @@ python onnx2trt.py --onnxFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_
 
 # Lightweight Image Super-Resolution
 python onnx2trt.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.onnx --task lightweight_sr
-
-# Real-World Image Super-Resolution
-python onnx2trt.py --onnxFile ./onnx_zoo/swinir_real_sr_x2/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN_surgeon.onnx --task real_sr
 
 # Color Image Denoising
 python onnx2trt.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15_surgeon.onnx --task color_dn
