@@ -63,7 +63,7 @@ python main_test_swinir.py --task lightweight_sr --scale 2 --model_path model_zo
 # Real-World Image Super-Resolution
 python main_test_swinir.py --task real_sr --scale 2 --model_path model_zoo/swinir/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN.pth --folder_lq testsets/RealSRSet+5images
 
-# Color Image Deoising
+# Color Image Denoising
 python main_test_swinir.py --task color_dn --noise 15 --model_path model_zoo/swinir/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.pth --folder_gt testsets/McMaster
 
 # JPEG Compression Artifact Reduction
@@ -81,7 +81,7 @@ python export.py --task lightweight_sr --scale 2 --model_path model_zoo/swinir/0
 # Real-World Image Super-Resolution
 python export.py --task real_sr --scale 2 --model_path model_zoo/swinir/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN.pth --folder_lq testsets/RealSRSet+5images
 
-# Color Image Deoising
+# Color Image Denoising
 python export.py --task color_dn --noise 15 --model_path model_zoo/swinir/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.pth --folder_gt testsets/McMaster
 
 # JPEG Compression Artifact Reduction
@@ -99,7 +99,7 @@ python surgeon.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweight
 # Real-World Image Super-Resolution
 python surgeon.py --onnxFile ./onnx_zoo/swinir_real_sr_x2/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN.onnx
 
-# Color Image Deoising
+# Color Image Denoising
 python surgeon.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.onnx
 
 # JPEG Compression Artifact Reduction
@@ -109,19 +109,19 @@ python surgeon.py --onnxFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126
 **导出TensorRT模型**
 ```python
 # Classical Image Super-Resolution
-python onnx2trt.py --onnxFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_DF2K_s64w8_SwinIR-M_x2_surgeon.onnx
+python onnx2trt.py --onnxFile ./onnx_zoo/swinir_classical_sr_x2/001_classicalSR_DF2K_s64w8_SwinIR-M_x2_surgeon.onnx --task classical_sr
 
 # Lightweight Image Super-Resolution
-python onnx2trt.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.onnx
+python onnx2trt.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweightSR_DIV2K_s64w8_SwinIR-S_x2_surgeon.onnx --task lightweight_sr
 
 # Real-World Image Super-Resolution
-python onnx2trt.py --onnxFile ./onnx_zoo/swinir_real_sr_x2/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN_surgeon.onnx
+python onnx2trt.py --onnxFile ./onnx_zoo/swinir_real_sr_x2/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN_surgeon.onnx --task real_sr
 
-# Color Image Deoising
-python onnx2trt.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15_surgeon.onnx
+# Color Image Denoising
+python onnx2trt.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15_surgeon.onnx --task color_dn
 
 # JPEG Compression Artifact Reduction
-python onnx2trt.py --onnxFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.onnx
+python onnx2trt.py --onnxFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.onnx --task jpeg_car
 ```
 
 **测试TensorRT模型**(支持动态尺寸)  
@@ -135,16 +135,31 @@ python testTRT.py --onnxFile ./onnx_zoo/swinir_lightweight_sr_x2/002_lightweight
 # Real-World Image Super-Resolution
 python testTRT.py --onnxFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.onnx --TRTFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.plan --task real_sr --scale 2 --model_path model_zoo/swinir/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN.pth --folder_lq testsets/RealSRSet+5images
 
-# Color Image Deoising
+# Color Image Denoising
 python testTRT.py --onnxFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15_surgeon.onnx --TRTFile ./onnx_zoo/swinir_color_dn_noise15/005_colorDN_DFWB_s128w8_SwinIR-M_noise15_surgeon.plan --task color_dn --noise 15 --model_path model_zoo/swinir/005_colorDN_DFWB_s128w8_SwinIR-M_noise15.pth --folder_gt testsets/McMaster
 
 # JPEG Compression Artifact Reduction
-python testTRT.py --onnxFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.onnx --TRTFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.plan --task jpeg_car --jpeg 10 --model_path model_zoo/swinir/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10.pth --folder_gt testsets/classic5
+python testTRT.py --onnxFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.onnx --TRTFile ./onnx_zoo/swinir_jpeg_car_jpeg10/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10_surgeon.plan --task jpeg_car --jpeg 10 --model_path model_zoo/swinir/006_CAR_DFWB_s126w7_SwinIR-M_jpeg10.pthc --folder_gt testsets/classic5
 ```
 
 ## 精度与加速效果
-无
+下列测试结果均在A10 GPU,TensorRT 8.4.5.1中测试得到
+#### Classical Image Super-Resolution
+Classical Image Super-Resolution任务中,采用了两种分辨率的原模型进行测试,分别是x2模型和x4模型,模型均采用SwinIR官方仓库[release模型](https://github.com/JingyunLiang/SwinIR/releases),并在多个数据集上进行测试,数据集下载可见[SwinIR官方仓库](https://github.com/JingyunLiang/SwinIR),FP32模型和FP16模型的加速比如下图所示
+![Classical](./figs/classical_SR.png)  
 
+#### Lightweight Image Super-Resolution
+Lightweight Image Super-Resolution任务中,采用了两种分辨率的原模型进行测试,分别是x2模型和x4模型,模型均采用SwinIR官方仓库[release模型](https://github.com/JingyunLiang/SwinIR/releases),并在多个数据集上进行测试,数据集下载可见[SwinIR官方仓库](https://github.com/JingyunLiang/SwinIR),FP32模型和FP16模型的加速比如下图所示
+![Lightweight](./figs/lightweight_SR.png)  
+
+#### Color Image Denoising
+Color Image Deoising任务中,采用了一种噪声程度的原模型进行测试,noise-15,模型均采用SwinIR官方仓库[release模型](https://github.com/JingyunLiang/SwinIR/releases),并在多个数据集上进行测试,数据集下载可见[SwinIR官方仓库](https://github.com/JingyunLiang/SwinIR),FP32模型和FP16模型的加速比如下图所示
+![Deoising](./figs/color_deoising.png)  
+
+
+#### JPEG Compression Artifact Reduction
+JPEG Compression Artifact Reduction任务中,采用了一种噪声程度的原模型进行测试,jpeg-15,模型均采用SwinIR官方仓库[release模型](https://github.com/JingyunLiang/SwinIR/releases),并在多个数据集上进行测试,数据集下载可见[SwinIR官方仓库](https://github.com/JingyunLiang/SwinIR),FP32模型和FP16模型的加速比如下图所示
+![JPEG](./figs/JPEG.png)  
 ## Bug报告（可选）
 无
 
