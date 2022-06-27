@@ -31,39 +31,33 @@ SwinIR模型转换为ONNX模型后，产生大量算子的原因有两个：1、
 ![gather](./figs/gather.png) 
 
 ## 优化过程  
-#### 代码框架
+**代码框架**
 代码框架与SwinIR原仓库结构基本保持一致
 .
-├── figs  # README.md相关的图片
+├── figs          # README.md相关的图片
 |
-├── model_zoo  # SwinIR pth模型
+├── model_zoo     # SwinIR pth模型
 │    └── swinir
+|      └── download.sh 模型下载脚本
 |
-├── calib_train_image   # INT8量化的数据约30660张, 开源代码该部分内容被删除
-│   ├── A_57b26b46_2e1e_11eb_9d64_00d861c69d42.jpg
-│   ├── ... ...
-│   └── N9_50667548_2e21_11eb_ac9b_00d861c69d42.jpg
+├── models        # 模型代码文件
+│   ├── network_swinir_ori.py # 原模型文件
+│   └── network_swinir.py # 改进后模型文件
 |
-├── test   # 性能测试需要的测试图像约1000张，开源代码该部分内容被删除
-│   ├── test_c6d6ecec_2fd1_11eb_b773_00d861c69d42.jpg
-│   ├── ... ...
-│   └── test_d4c4ea34_2fd1_11eb_9f0e_00d861c69d42.jpg
+├── onnx_zoo      # ONNX模型文件和Plan模型文件
 |
-├── checkpoint  # DETR Pytorch 模型，开源代码该部分仅提供模型下载链接
-│   ├── detr_resnet50.pth
-│   └── log.txt
-├── pic  # README 静态资源文件
+├── plugin        # plugin文件
+│   ├── ...
+│   └── build.sh  # 编译脚本
 |
-├── detr_pth2onnx.py  # pytorch 转onnx支持static,dynamic shape, btached, onnx check, onnx-simplifier, onnx-graphsurgeon
-├── generate_batch_plan.py  # 生成batched static tensorrt 序列化engine文件，支持FP32,FP16,任意batch size
-├── inference_detr_onnx.py   # onnx runtime模型推断，支持static,dynamic shape,用于验证onnx的正确性
-├── inference_detr_trt.py   # tensorrt模型推断，支持，static,dynamic shape,FP32,FP16,INT8并检验engine是否存在，不存在调用序列化程序
-├── performance_accuracy_detr.py  # TensorRT识别精度的计算和可视化
-├── performance_time_detr.py      # TensorRT benchmark的计算和可视化
-├── trt_int8_quant.py  # INT8量化，并生成量化模型的engine和cache文件
+├── testsets      # 测试用的部分数据
 |
-├── requirements.txt   # Python package list
-├── LICENSE     
+├── utils         # 构建模型相关的工具
+├── export.py     # 用于导出ONNX模型
+├── main_test_swinir.py  # 用于测试PyTorch模型
+├── onnx2trt.py   # 用于转化TRT模型
+├── surgeon.py    # 用于ONNX surgeon
+├── testTRT.py    # 用于TRT模型
 └── README.md
 
 ## 测试流程
@@ -79,12 +73,16 @@ pip install -r requirments.txt
 ```
 
 
-**下载预训练模型**
+**下载预训练模型&编译plugin**
 ```bash
 cd model_zoo/swinir
 chmod +x ./download.sh
 # 为了节省时间，只下载部分模型，需要下载其他模型，可以对脚本进行修改
 ./download.sh
+
+cd ../../plugin
+chmod +x ./build.sh
+./build.sh
 ```
 
 **PyTorch测评**
