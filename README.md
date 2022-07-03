@@ -101,7 +101,7 @@ gather操作对应的是代码中得到q、k、v的操作，直接转TRT模型�
 ## 测试流程
 **Docker**  
 建议使用[NGC](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tensorrt)  
-本项目代码在TensorRT 8.2.5.1与TensorRT 8.4.1.5中均通过测试。
+本项目代码在TensorRT 8.2.5.1与TensorRT 8.4.1.5中均通过测试。注意！请确认onnx，onnx-graphsurgeon、torch版本与requirments.txt保持一致，不然导出的ONNX模型可能会有所差别，从而导致运行失败。
 
 **安装**  
 ```bash
