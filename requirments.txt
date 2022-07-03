@@ -4,9 +4,9 @@ tqdm==4.62.2
 Pillow
 ipython
 
-onnx
+onnx==1.11.0
 nvidia-pyindex
-onnx-graphsurgeon
+onnx-graphsurgeon==0.3.19
 
 --extra-index-url https://download.pytorch.org/whl/cu115
 torch==1.11.0+cu115
